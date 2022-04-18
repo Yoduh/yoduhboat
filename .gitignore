@@ -1,4 +1,4 @@
 .env
 /node_modules
 /sounds
-/descriptions.txt
+/descriptions.json
