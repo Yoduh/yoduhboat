@@ -1,0 +1,27 @@
+const entranceCommand = require("./entrances");
+const describeCommand = require("./describe");
+const commandsCommand = require("./commands");
+const addCommand = require("./add");
+const joinCommand = require("./join");
+const playCommand = require("./play");
+const leaveCommand = require("./leave");
+const whatisCommand = require("./whatis");
+const volumeCommand = require("./volume");
+const listCommand = require("./list");
+const removeCommand = require("./remove");
+const stopCommand = require("./stop");
+const trimCommand = require("./trim");
+
+exports.entrances = entranceCommand;
+exports.describe = describeCommand;
+exports.commands = commandsCommand;
+exports.add = addCommand;
+exports.join = joinCommand;
+exports.play = playCommand;
+exports.leave = leaveCommand;
+exports.whatis = whatisCommand;
+exports.volume = volumeCommand;
+exports.list = listCommand;
+exports.remove = removeCommand;
+exports.stop = stopCommand;
+exports.trim = trimCommand;
