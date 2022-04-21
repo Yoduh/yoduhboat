@@ -40,10 +40,6 @@ player.on(AudioPlayerStatus.Idle, async () => {
     }
 });
 
-player.on(AudioPlayerStatus.Playing, () => {
-    console.log("player now playing")
-});
-
 const prefix = "!!";
 const timeout = 10 * 60 * 1000 // min * sec * ms
 let conn = null;
