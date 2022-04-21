@@ -38,7 +38,7 @@ const command = async (args, message) => {
             });
         })
     } else {
-        writeDescription(describeName, describeText);
+        metadata.updateDescription(describeName, describeText);
         message.reply("description updated!");
     }
     return;

@@ -16,7 +16,7 @@ async function createCommandsEmbed() {
             i++;
             fieldArray[i] = { name: '\u200B', value: "", inline: true }
         }
-        fieldArray[i].value += files[j].split(".mp3")[0] + "\u000A"
+        fieldArray[i].value += files[j].split(".opus")[0] + "\u000A"
     }
     fieldArray[0].name = "Sound Bite List"
     const commandEmbed = new MessageEmbed()

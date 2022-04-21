@@ -31,7 +31,10 @@ const writeMetadata = (name, link, start, duration, user) => {
     fs.writeFileSync("./descriptions.json", JSON.stringify(data, null, "\t"));
 }
 
-const removeMetadata = (args) => {
+const removeMetadata = (name) => {
+    let data = JSON.parse(fs.readFileSync("./descriptions.json"));
+    data = data.filter(s => s.name !== name.toLowerCase())
+    fs.writeFileSync("./descriptions.json", JSON.stringify(data, null, "\t"));
 }
 
 const updateDescription = (name, description) => {

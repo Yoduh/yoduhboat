@@ -7,10 +7,10 @@ const command = async (args, message) => {
         return;
     }
     let fileToRemove = args[0];
-    if (!fs.existsSync(`./sounds/${fileToRemove}.mp3`)) {
+    if (!fs.existsSync(`./sounds/${fileToRemove}.opus`)) {
         message.reply("could not find the file, does it appear when you try the !!list command?");
     } else {
-        fs.unlinkSync(`./sounds/${fileToRemove}.mp3`)
+        fs.unlinkSync(`./sounds/${fileToRemove}.opus`)
         metadata.remove(fileToRemove);
         message.reply("sound removed");
     }

@@ -6,7 +6,7 @@ const command = async (args, message) => {
         message.reply("you did not specify a sound name");
         return;
     }
-    if (!fs.existsSync(`./sounds/${args[0]}.mp3`)) {
+    if (!fs.existsSync(`./sounds/${args[0]}.opus`)) {
         message.reply("can not find a sound by that name");
         return;
     }
@@ -31,7 +31,7 @@ async function trim(name, s, e) {
     let duration = 0;
     try {
         duration = await new Promise((resolve, reject) => {
-            ffmpeg.ffprobe(`./sounds/${name}.mp3`, function(err, metadata) {
+            ffmpeg.ffprobe(`./sounds/${name}.opus`, function(err, metadata) {
                 if (err) {
                     return reject(err);
                 }
@@ -45,8 +45,8 @@ async function trim(name, s, e) {
     if (trimAmount >= duration) return "error: you're trying to trim longer than the duration of the sound bite";
 
     let newDuration = Math.round((duration - end - start + Number.EPSILON) * 100) / 100
-    let ffmpegCommand = ffmpeg(`./sounds/${name}.mp3`)
-        .output(`./sounds/${name}__TEMP.mp3`)
+    let ffmpegCommand = ffmpeg(`./sounds/${name}.opus`)
+        .output(`./sounds/${name}__TEMP.opus`)
         .setStartTime(start)
         .setDuration(newDuration);
 

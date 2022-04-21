@@ -24,11 +24,11 @@ const timestampToSeconds = (timestamp) => {
 }
 const replaceTempSound = (oldSound) => {
     const newSound = oldSound+"__TEMP";
-    if (!fs.existsSync(`./sounds/${newSound}.mp3`)) {
+    if (!fs.existsSync(`./sounds/${newSound}.opus`)) {
         return false;
     }
-    fs.unlinkSync(`./sounds/${oldSound}.mp3`)
-    fs.renameSync(`./sounds/${newSound}.mp3`, `./sounds/${oldSound}.mp3`);
+    fs.unlinkSync(`./sounds/${oldSound}.opus`)
+    fs.renameSync(`./sounds/${newSound}.opus`, `./sounds/${oldSound}.opus`);
     return true;
 }
 

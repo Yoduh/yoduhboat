@@ -1,7 +1,8 @@
 const util = require('../helpers/util');
 const metadata = require('../helpers/metadata');
-const youtubeMp3Converter = require('youtube-mp3-converter');
-const convertLinkToMp3 = youtubeMp3Converter("./sounds");
+const youtubeConverter = require('../helpers/converter');
+const convertLink = youtubeConverter("./sounds");
+const ytdl = require('ytdl-core');
 const fs = require('fs');
 
 // reserved words for commands only
@@ -17,12 +18,12 @@ const command = async (args, message) => {
         message.reply("that word is reserved for a bot command, try a different name!");
         return;
     }
-    if (fs.existsSync(`./sounds/${name}.mp3`)) {
+    if (fs.existsSync(`./sounds/${name}.opus`)) {
         message.reply("a sound bite with that name already exists, try giving a different name");
         return;
     }
     let link = null;
-    let start = null;
+    let start = "00:00";
     let end = null;
     let duration = null;
     if (!args[1] || !args[1].includes("youtu")) {
@@ -36,22 +37,22 @@ const command = async (args, message) => {
     }
     if (args[3]) {
         end = args[3].toLowerCase();
+    } else {
+        end = await ytdl.getInfo(link).then(info => info.videoDetails.lengthSeconds);
     }
-    if (start && end) {
-        duration = util.getTimeDifference(start, end);
-    }
-    let pathToMp3 = null;
-    // Downloads mp3 and Returns path were it was saved.
+    duration = util.getTimeDifference(start, end);
+    let pathToSound = null;
+    // Downloads sound and returns path where it was saved.
     try {
-        pathToMp3 = await convertLinkToMp3(link, {
-            startTime: start, // from where in the video the mp3 should start
-            duration: duration, // Length of mp3 in seconds (from start point)
-            title: name // name for mp3 file
+        pathToSound = await convertLink(link, {
+            startTime: start, // from where in the video the sound bite should start
+            duration: duration, // Length of sound bite in seconds (from start point)
+            title: name // name for sound file
         });
     } catch(e) {
         console.log("failed to convert:", e);
     }
-    if (pathToMp3) {
+    if (pathToSound) {
         metadata.write(name, link, start, duration, message.member.user.username);
         message.reply(`sound successfully added, use '!!${name}' to play this sound bite`);
     } else {

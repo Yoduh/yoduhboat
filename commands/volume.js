@@ -21,11 +21,11 @@ const command = async (args, message) => {
 async function modifyVolume(sound, volume) {
     console.log("modifying volume");
     return new Promise((resolve, reject) =>
-        ffmpeg(`./sounds/${sound}.mp3`)
+        ffmpeg(`./sounds/${sound}.opus`)
             .audioFilters([{ filter: 'volume', options: volume }])
             .on('error', (err) => reject(err))
-            .on('end', () => resolve(`./sounds/${sound}.mp3`))
-            .saveToFile(`./sounds/${sound}__TEMP.mp3`));
+            .on('end', () => resolve(`./sounds/${sound}.opus`))
+            .saveToFile(`./sounds/${sound}__TEMP.opus`));
 }
 
 module.exports = command;
