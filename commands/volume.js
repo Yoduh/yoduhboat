@@ -1,19 +1,28 @@
 const util = require('../helpers/util');
 const ffmpeg = require('fluent-ffmpeg');
+const fs = require('fs');
 
 const command = async (args, message) => {
     if (!args[0]) {
         message.reply("you did not specify a sound name");
         return;
     }
+    let sound = args[0];
     if (!args[1]) {
         message.reply("you did not specify a volume amount");
         return;
     }
-    await modifyVolume(args[0], args[1]);
-    let volResult = util.replaceTempSound(args[0]);
+    let vol = args[1]
+    if (!fs.existsSync(`./sounds/${sound}.opus`)) {
+        if (!isWeb) {
+            message.reply("sorry I can't find a sound by that name");
+        }
+        return;
+    }
+    await modifyVolume(sound, vol);
+    let volResult = util.replaceTempSound(sound);
     if (volResult)
-        message.reply(`volume of ${args[0]} multiplied by ${args[1]}`);
+        message.reply(`volume of ${sound} multiplied by ${vol}`);
     else
         message.reply("oops, something went wrong. seek developer help");
 }

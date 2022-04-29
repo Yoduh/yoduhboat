@@ -1,5 +1,31 @@
 require('dotenv').config();
 const axios = require('axios');
+const { createLogger, format, transports } = require('winston');
+
+const logger = createLogger({
+  level: 'info',
+  format: format.combine(
+    format.timestamp({
+        format: 'YYYY-MM-DD HH:mm:ss'
+      }),
+    format.align(),
+    format.errors({ stack: true}),
+    format.printf(info => `${info.timestamp} ${info.level}: ${info.message}\n${JSON.stringify(info.discordInfo)}\n${info.stack}`)
+  ),
+  defaultMeta: { service: 'bloop-bot' },
+  transports: [
+    // - Write to all logs with level `info` and below to `bloop-info.log`.
+    new transports.File({ filename: 'bloop-info.log' })
+  ]
+});
+if (process.env.NODE_ENV !== 'production') {
+    logger.add(new transports.Console({
+        format: format.combine(
+        format.colorize(),
+        format.simple()
+        )
+    }));
+}
 ////////////////////// Bloop Bot //////////////////////////
 /*
 known issues: 
@@ -41,12 +67,12 @@ player.on(AudioPlayerStatus.Idle, async () => {
 });
 
 const prefix = "!!";
+const yoduhId = '200809303907631104';
 const timeout = 10 * 60 * 1000 // min * sec * ms
 let conn = null;
 let subscription = null;
 let timeoutID;
 let queue = [];
-let entrances = true;
 
 try {
 	client.login(process.env.DISCORD_TOKEN);
@@ -71,21 +97,37 @@ client.on("ready", () => {
   console.log("bot is online");
 });
 
+client.on("error", (e, message) => {
+    let simpleMessage = '';
+    if (message) {
+        simpleMessage = {
+            content: message.content,
+            user: message.member.displayName,
+            guildId: message.guildId,
+            channelId: message.channelId
+        }
+        message.reply(`I've encountered an error. <@${yoduhId}> check the logs!`);
+    }
+    logger.info({message: new Error(e), discordInfo: simpleMessage, stack: e.stack});
+    console.error(e);
+})
+
 client.on("voiceStateUpdate", async (oldState, newState) => {
     // entrance music for users
-    if (entrances) {
-        if (newState.channelId && newState.channelId !== oldState.channelId && !newState.member.user.bot) {
-            let joinedUser = newState.member.user.username.toLowerCase();
-            let match = fs.readdirSync('./sounds/').find(s => joinedUser.startsWith(s.split(".")[0]));
-            if (!match) return;
-            console.log("playing entrance music ", match);
+    if (newState.channelId && newState.channelId !== oldState.channelId && !newState.member.user.bot) {
+        let joinedUser = newState.member.user.username.toLowerCase();
+        console.log(`checking ${joinedUser} for entrance music`);
+        let user = await User.findOne({userId: newState.member.user.id});
+        let userSound = user?.entrance?.sound;
+        if (userSound && user.entrance.enabled) {
             conn = await joinVoiceChannel({
                 channelId: newState.channelId,
                 guildId: newState.guild.id,
                 adapterCreator: newState.channel.guild.voiceAdapterCreator,
             });
             subscription = conn.subscribe(player);
-            const resource = createAudioResource(`./sounds/${match}`, {
+            console.log(`playing entrance music ${userSound}`);
+            const resource = createAudioResource(`./sounds/${userSound}.opus`, {
                 inputType: StreamType.Arbitrary,
             });
             clearTimeout(timeoutID);
@@ -98,8 +140,11 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
                 }
             }, timeout)
             return;
+        } else {
+            console.log("entrance music not enabled for user, continuing...")
         }
     }
+
     if (oldState.channelId !== oldState.guild.me.voice.channelId || !oldState.channel){
         return(0); //If it's not the channel the bot's in
     }
@@ -112,89 +157,106 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
     }
 });
 
+process.on('unhandledRejection', (error) => {
+    console.error('Unhandled promise rejection:', error);
+});
+
 client.on("messageCreate", async (message) => {
 	// console.log("message = ", message);
 	// console.log("message.channel.id = ", message.channel.id);
 	// console.log("message.content = ", message.content);
-	if (!message.content.startsWith(prefix)) return;
+	if (!message.content.startsWith(prefix) || message.author.bot) return;
 
 	const commandBody = message.content.slice(prefix.length);
 	const args = commandBody.split(' ');
 	const command = args.shift().toLowerCase();
     console.log("command = ", command);
-	switch(command) {
-		case "join":
-            clearTimeout(timeoutID);
-            conn = await commands.join(message);
-            timeoutID = setTimeout(() => { // idle disconnect
-                if (conn?.disconnect && conn.state.status !== 'destroyed') {
-                    console.log("idling too long after joining, disconnecting")
-                    conn.disconnect();
-                    conn.destroy();
-                }
-            }, timeout)
-			break;
-		case "add":
-            commands.add(args, message);
-            break;
-        case "play":
-            clearTimeout(timeoutID);
-            let playResult = await commands.play(args, false, message, player, queue, subscription);
-            if (playResult?.conn) conn = playResult.conn;
-            if (playResult?.subscription) subscription = playResult.subscription;
-            timeoutID = setTimeout(() => { // idle disconnect
-                if (conn?.disconnect && conn.state.status !== 'destroyed') {
-                    console.log("idling too long after playing, disconnecting")
-                    conn.disconnect();
-                    conn.destroy();
-                }
-            }, timeout)
-            break;
-        case "volume":
-            commands.volume(args, message);
-            break;
-        case "trim":
-            // work in progress
-            //commands.trim(args, message);
-            break;
-        case "list":
-            commands.list(message);
-            break;
-        case "remove":
-            commands.remove(args, message);
-            break;
-        case "stop":
-            commands.stop(queue, player, message);
-            break;
-        case "commands":
-            commands.commands(message);
-            break;
-        case "whatis":
-            commands.whatis(args, message);
-            break;
-        case "describe":
-            commands.describe(args, message);
-            break;
-        case "leave":
-            commands.leave(message);
-            break;
-        case "entrances":
-            entrances = commands.entrances(entrances, message);
-            break;
-		default:
-            clearTimeout(timeoutID);
-            let defPlayResult = await commands.play([command], false, message, player, queue, subscription);
-            if (defPlayResult?.conn) conn = defPlayResult.conn;
-            if (defPlayResult?.subscription) subscription = defPlayResult.subscription;
-            timeoutID = setTimeout(() => { // idle disconnect
-                if (conn?.disconnect && conn.state.status !== 'destroyed') {
-                    console.log("idling too long after default play, disconnecting")
-                    conn.disconnect();
-                    conn.destroy();
-                }
-            }, timeout)
-            break;
-	}
+    try {
+        switch(command) {
+            case "join":
+                clearTimeout(timeoutID);
+                conn = await commands.join(message);
+                timeoutID = setTimeout(() => { // idle disconnect
+                    if (conn?.disconnect && conn.state.status !== 'destroyed') {
+                        console.log("idling too long after joining, disconnecting")
+                        conn.disconnect();
+                        conn.destroy();
+                    }
+                }, timeout)
+                break;
+            case "add":
+                commands.add(args, message, false);
+                break;
+            case "play":
+                clearTimeout(timeoutID);
+                let playResult = await commands.play(args, false, message, player, queue, subscription);
+                if (playResult?.conn) conn = playResult.conn;
+                if (playResult?.subscription) subscription = playResult.subscription;
+                timeoutID = setTimeout(() => { // idle disconnect
+                    if (conn?.disconnect && conn.state.status !== 'destroyed') {
+                        console.log("idling too long after playing, disconnecting")
+                        conn.disconnect();
+                        conn.destroy();
+                    }
+                }, timeout)
+                break;
+            case "volume":
+                commands.volume(args, message);
+                break;
+            case "trim":
+                // work in progress
+                //commands.trim(args, message);
+                break;
+            case "list":
+                commands.list(message);
+                break;
+            case "remove":
+                commands.remove(args, message);
+                break;
+            case "stop":
+                commands.stop(queue, player, message);
+                break;
+            case "commands":
+                commands.commands(message);
+                break;
+            case "whatis":
+                commands.whatis(args, message);
+                break;
+            case "describe":
+                commands.describe(args, message);
+                break;
+            case "leave":
+                commands.leave(message);
+                break;
+            case "entrance":
+                commands.entrance(args, message);
+                break;
+            // i have no idea why this doesn't work.  would be great if it did and bloop bot didn't have to deal with AudioPlayer and juggling connection subscriptions
+            // case "test":
+            //     conn = await joinVoiceChannel({
+            //         channelId: message.member.voice.channel.id,
+            //         guildId: message.guild.id,
+            //         adapterCreator: message.guild.voiceAdapterCreator
+            //     });
+            //     conn.playOpusPacket(fs.readFileSync('./sounds/bruh.opus'));
+            //     break;
+            default:
+                clearTimeout(timeoutID);
+                let defPlayResult = await commands.play([command], false, message, player, queue, subscription);
+                if (defPlayResult?.conn) conn = defPlayResult.conn;
+                if (defPlayResult?.subscription) subscription = defPlayResult.subscription;
+                timeoutID = setTimeout(() => { // idle disconnect
+                    if (conn?.disconnect && conn.state.status !== 'destroyed') {
+                        console.log("idling too long after default play, disconnecting")
+                        conn.disconnect();
+                        conn.destroy();
+                    }
+                }, timeout)
+                break;
+        }
+    } catch(e) {
+        client.emit('error', e, message)
+    }
 });
 
 ////////////////////// API code /////////////////////////////
@@ -211,6 +273,17 @@ client.on("apiMessage", async (apiMessage) => {
     let webPlayResult = await commands.play([apiMessage.name], true, message, player, queue, subscription);
     if (webPlayResult?.conn) conn = webPlayResult.conn;
     if (webPlayResult?.subscription) subscription = webPlayResult.subscription;
+    let webChannel = client.guilds.cache.get(apiMessage.guildId).channels.cache.find(c => c.name === 'soundboard' && c.type === 'GUILD_TEXT');
+    if (webChannel) {
+        let webhooks = await webChannel.fetchWebhooks();
+        if (webhooks) {
+            webhooks.first().send({
+                content: `!!${apiMessage.name}`,
+                username: apiMessage.username,
+                avatarURL: `https://cdn.discordapp.com/avatars/${apiMessage.userId}/${apiMessage.userAvatar}.jpg`
+            })
+        }
+    }
     timeoutID = setTimeout(() => { // idle disconnect
         if (conn?.disconnect && conn.state.status !== 'destroyed') {
             console.log("idling too long after web play, disconnecting")
@@ -222,6 +295,9 @@ client.on("apiMessage", async (apiMessage) => {
 
 const express = require('express');
 const cors = require('cors');
+const mongoose = require("mongoose");
+const User = require("./db/User");
+mongoose.connect("mongodb://localhost/bloop");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -230,13 +306,75 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 
 var corsOptions = {
-    origin: 'http://localhost:3000',
+    origin: ['http://localhost:3000', 'https://bloopbot.netlify.app'],
     optionsSuccessStatus: 200
 }
 
 app.use(cors(corsOptions));
+app.use(express.static(__dirname + '/sounds'));
 
-app.post('/api/sound', (req, res) => {
+app.post('/api/getToken', async (req, res) => {
+    if (corsOptions.origin.includes(req.headers.referer))
+    res.send("unauthorized origin");
+
+    const params = new URLSearchParams();
+      params.append('client_id', process.env.DISCORD_CLIENT_ID);
+      params.append('client_secret', process.env.DISCORD_CLIENT_SECRET);
+      params.append('grant_type', 'authorization_code');
+      params.append('code', req.query.code);
+      params.append('redirect_uri', `${req.headers.referer}auth/redirect`);
+      // fetch the access token
+      axios
+        .post('https://discord.com/api/v8/oauth2/token', params, {
+          headers: {
+            'content-type': 'application/x-www-form-urlencoded'
+          }
+        }).then(result => {
+            res.send(result.data);
+        })
+});
+
+app.post('/api/setToken', async (req, res) => {
+    try {
+        const tokenResponse = await axios.get('https://discordapp.com/api/users/@me', {
+            headers: {
+            Authorization: `Bearer ${req.body.access_token}`
+            }
+        });
+        if (tokenResponse.status === 200) {
+            let user = await User.findOneAndUpdate(
+                {userId: tokenResponse.data.id}, // find existing user
+                {                                // user information to update
+                    ...req.body,
+                    userId: tokenResponse.data.id,
+                    username: tokenResponse.data.username,
+                    updatedAt: Date.now()
+                },
+                {upsert: true, new: true}, // options (upsert: create on not found, new: return updated user after transaction)
+            )
+            console.log("finding/updating", user);
+        }
+        res.sendStatus(tokenResponse.status);
+    } catch (e) {
+        console.log("error in /api/setToken", e);
+        res.sendStatus(401);
+    }
+});
+
+/////////////// required authorization routes below ///////////////
+
+app.use(async (req, res, next) => {
+    if (!req.headers.authorization) {
+        return res.status(403).json({ error: 'No credentials sent!' });
+    } 
+    const isValidUser = await validateUser(req);
+    if (!isValidUser) {
+        return res.status(403).json({ error: 'Not a valid discord user!' });
+    }
+    next();
+})
+
+app.post('/api/play', (req, res) => {
     if (client.guilds.cache.get(req.body.guildId).channels.cache.get(req.body.channelId).members.size === 0) {
         res.status(405).json({ message: "Can't send sound bite to empty voice channel!" });
         return;
@@ -250,6 +388,19 @@ app.post('/api/servers', (req, res) => {
     let userGuilds = req.body.guilds;
     let matchingGuilds = userGuilds.filter(g => botGuilds.includes(g));
     res.send(matchingGuilds);
+})
+app.get('/api/sound', (req, res) => {
+    let soundRequest = req.query.name;
+    try {
+        let soundBytes = fs.readFileSync(`./sounds/${soundRequest}.opus`);
+        res.send(soundBytes);
+        // const filePath = resolve(`./sounds/${soundRequest}.opus`);
+        // res.sendFile(filePath)
+    } catch(e) {
+        console.log(e);
+        res.sendStatus(404);
+    }
+
 })
 app.get('/api/sounds', (req, res) => {
     //let guild = req.query.server; // one day when sounds are tied to servers bot will need to get server id from query param
@@ -269,6 +420,22 @@ app.post('/api/channels', async (req, res) => {
     })
     res.send(result);
 })
+
+app.post('/api/add', async (req, res) => {
+    let addResponse = await commands.add(req.body.args, null, req.body.username);
+    res.status(addResponse[0])
+    res.send(addResponse[1]);
+})
+
+async function validateUser(req) {
+    console.log("auth", req.headers.authorization);
+    let auth = JSON.parse(req.headers.authorization);
+    let user = await User.findOne({
+        userId: auth.id, 
+        access_token: auth.access_token
+    });
+    return !!user;
+}
 
 app.listen(PORT, () => {
     console.log(`Now listening to requests on port ${PORT}`);

@@ -1,4 +1,4 @@
-const entranceCommand = require("./entrances");
+const entranceCommand = require("./entrance");
 const describeCommand = require("./describe");
 const commandsCommand = require("./commands");
 const addCommand = require("./add");
@@ -12,7 +12,7 @@ const removeCommand = require("./remove");
 const stopCommand = require("./stop");
 const trimCommand = require("./trim");
 
-exports.entrances = entranceCommand;
+exports.entrance = entranceCommand;
 exports.describe = describeCommand;
 exports.commands = commandsCommand;
 exports.add = addCommand;

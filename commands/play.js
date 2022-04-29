@@ -35,8 +35,9 @@ const command = async (args, isWeb, message, player, queue, subscription) => {
     conn = await joinCommand(message);
     subscription = conn.subscribe(player);
     console.log(`playing sound ${isWeb ? 'from web' : ''}`, sound);
+    // eventually alert server who is playing sound from the website
     // if (isWeb) {
-    //     getchannel.send("dude is playing sound for you")
+    //     getchannel.send("<user> is playing sound via web")
     // }
     const resource = createAudioResource(createReadStream(`./sounds/${sound}.opus`), {
         inputType: StreamType.OggOpus,

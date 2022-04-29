@@ -20,7 +20,7 @@ const timestampToSeconds = (timestamp) => {
         timestamp = split[0];
         ms = Number("0." + split[1]);
     }
-    return Number(timestamp.split(':').reduce((acc,time) => (60 * acc) + +time) + ms);
+    return parseInt(timestamp.split(':').reduce((acc,time) => (60 * acc) + +time) + ms);
 }
 const replaceTempSound = (oldSound) => {
     const newSound = oldSound+"__TEMP";

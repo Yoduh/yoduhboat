@@ -11,7 +11,7 @@ const command = (message) => {
         "!!whatis <name> - show sound bite details\n"+
         "!!describe <name> <text> - saves a description for a sound bite\n"+
         "!!stop - stop the currently playing sound bite\n"+
-        "!!entrances - toggles whether bot should automatically play a sound bite named after a user whenever that user joins a voice channel\n"+
+        "!!entrance <name(OPTIONAL)> - turn your entrance music on or off. provide a name to set what your entrance music should be.\n"+
         "!!list - list all sound bites"+
         "\`\`\`");
 }
