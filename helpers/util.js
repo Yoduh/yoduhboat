@@ -8,10 +8,9 @@ const getTimeDifference = (start, end) => {
 
     return Number(diff);
 }
-
 const timestampToSeconds = (timestamp) => {
     // timestamp given is already in seconds
-    if (!timestamp.includes(":")) {
+    if (!String(timestamp).includes(":")) {
         return Number(timestamp);
     }
     let ms = 0;
@@ -20,7 +19,27 @@ const timestampToSeconds = (timestamp) => {
         timestamp = split[0];
         ms = Number("0." + split[1]);
     }
-    return parseInt(timestamp.split(':').reduce((acc,time) => (60 * acc) + +time) + ms);
+    let res = parseInt(timestamp.split(':').reduce((acc,time) => (60 * acc) + +time) + ms);
+    return res;
+}
+const secondsToTimestamp = (seconds) => {
+    if (String(seconds).includes(":")) {
+        return seconds;
+    } else {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        const ms = Math.round((seconds - Math.floor(seconds)) * 100);
+        let res = [
+        h > 0 ? h : '',
+        h > 0 && m <= 9 ? '0' + m : m || '0',
+        s > 9 ? s : '0' + s
+        ]
+        .filter(Boolean)
+        .join(':');
+        res += '.' + (ms > 9 ? ms : '0' + ms);
+        return res;
+    }
 }
 const replaceTempSound = (oldSound) => {
     const newSound = oldSound+"__TEMP";
@@ -35,3 +54,4 @@ const replaceTempSound = (oldSound) => {
 exports.getTimeDifference = getTimeDifference;
 exports.timestampToSeconds = timestampToSeconds;
 exports.replaceTempSound = replaceTempSound;
+exports.secondsToTimestamp = secondsToTimestamp;

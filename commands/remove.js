@@ -1,5 +1,5 @@
 const fs = require('fs');
-const metadata = require('../helpers/metadata');
+const Sound = require("../db/Sound");
 
 const command = async (args, message) => {
     if (!args[0]) {
@@ -11,7 +11,7 @@ const command = async (args, message) => {
         message.reply("could not find the file, does it appear when you try the !!list command?");
     } else {
         fs.unlinkSync(`./sounds/${fileToRemove}.opus`)
-        metadata.remove(fileToRemove);
+        await Sound.deleteOne({ name: fileToRemove })
         message.reply("sound removed");
     }
 }

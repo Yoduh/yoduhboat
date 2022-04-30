@@ -1,5 +1,4 @@
 const util = require('../helpers/util');
-const metadata = require('../helpers/metadata');
 const youtubeConverter = require('../helpers/converter');
 const convertLink = youtubeConverter("./sounds");
 const ytdl = require('ytdl-core');
@@ -30,8 +29,10 @@ const command = async (args, message, webUser) => {
         return;
     }
     let link = null;
-    let start = "00:00";
+    let start = 0;
+    let startTime = "0:00.00";
     let end = null;
+    let endTime = null;
     let duration = null;
     if (!args[1] || !args[1].includes("youtu")) {
         message.reply("I don't see a youtube link, did you use the proper command format?");
@@ -40,12 +41,15 @@ const command = async (args, message, webUser) => {
         link = args[1];
     }
     if (args[2]) {
-        start = args[2].toLowerCase();
+        start = util.timestampToSeconds(args[2]);
+        startTime = util.secondsToTimestamp(args[2]);
     }
     if (args[3]) {
-        end = args[3].toLowerCase();
+        end = util.timestampToSeconds(args[3]);
+        endTime = util.secondsToTimestamp(args[3]);
     } else {
         end = await ytdl.getInfo(link).then(info => info.videoDetails.lengthSeconds);
+        endTime = util.secondsToTimestamp(end);
     }
     duration = util.getTimeDifference(start, end);
     let pathToSound = null;
@@ -60,7 +64,19 @@ const command = async (args, message, webUser) => {
         console.log("failed to convert:", e);
     }
     if (pathToSound) {
-        metadata.write(name, link, start, duration, webUser ? webUser : message.member.user.username);
+        // metadata.write(name, link, start, duration, webUser ? webUser : message.member.user.username);
+        const newSound = new Sound({
+            name: name,
+            file: pathToSound,
+            link: link,
+            start: start,
+            startTime: startTime,
+            end: end,
+            endTime: endTime,
+            user: webUser ? webUser : message.member.displayName,
+            duration: duration
+        });
+        newSound.save();
         if (webUser) {
             return [200, `Sound successfully added!`]
         }

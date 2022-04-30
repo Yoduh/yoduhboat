@@ -1,7 +1,6 @@
 require('dotenv').config();
 const axios = require('axios');
 const { createLogger, format, transports } = require('winston');
-
 const logger = createLogger({
   level: 'info',
   format: format.combine(
@@ -78,14 +77,6 @@ try {
 	client.login(process.env.DISCORD_TOKEN);
 	console.log("logged in successfully");
     // first time initialization stuff
-    if(!fs.existsSync("./descriptions.json")) {
-        fs.writeFile("./descriptions.json", JSON.stringify([], null, "\t"), err => {
-            if (err) {
-                console.error(err);
-                return;
-            }
-        });
-    }
     if (!fs.existsSync("./sounds")) {
         fs.mkdirSync("./sounds");
     }
@@ -166,6 +157,11 @@ client.on("messageCreate", async (message) => {
 	// console.log("message.channel.id = ", message.channel.id);
 	// console.log("message.content = ", message.content);
 	if (!message.content.startsWith(prefix) || message.author.bot) return;
+    
+    // if (message.member.displayName !== 'Yoduh') {
+    //     message.reply("Yoduh says \"Bot is undergoing maintenance right now, SORRY\"");
+    //     return;
+    // }
 
 	const commandBody = message.content.slice(prefix.length);
 	const args = commandBody.split(' ');
@@ -297,6 +293,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require("mongoose");
 const User = require("./db/User");
+const Sound = require("./db/Sound");
 mongoose.connect("mongodb://localhost/bloop");
 
 const app = express();
@@ -402,10 +399,10 @@ app.get('/api/sound', (req, res) => {
     }
 
 })
-app.get('/api/sounds', (req, res) => {
+app.get('/api/sounds', async (req, res) => {
     //let guild = req.query.server; // one day when sounds are tied to servers bot will need to get server id from query param
-    let data = JSON.parse(fs.readFileSync("./descriptions.json"));
-    res.send(data);
+    let soundData = await Sound.find({}, '-_id -__v');
+    res.send(soundData);
 })
 app.post('/api/channels', async (req, res) => {
     let channels = client.guilds.cache.get(req.body.guildId).channels.cache

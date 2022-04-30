@@ -1,17 +1,18 @@
 # bloop-bot
+
 add, remove, play sound bites from youtube videos all within discord
 
 create your own bot at https://discord.com/developers/applications
 <br>after pulling, create .env file with `DISCORD_TOKEN=` using your bot's token.
 <br>install dependences with `yarn install`
+<br>local mongodb for storing user and sound bite metadata is required
 <br>run with `node index.js`
 <br>
-<br>no backend (current work in progress) so all mp3 files ripped from youtube are saved to /sounds/ directory. 
-metadata for sound bite files are saved locally in descriptions.json.  bot will auto create /sounds/ and descriptions.json on first run.
+<br>all sounds files ripped from youtube are saved in opus format to the project's local /sounds directory. bot will auto create the /sounds directory on first run.
 <br>FFMPEG must be installed on the local machine running the bot or the youtube ripping will not work
 
-
 list of bot commands:
+
 ```
 !!join - bot joins your voice channel
 !!leave - bot leaves your voice channel
@@ -23,6 +24,6 @@ list of bot commands:
 !!whatis <name> - show sound bite details
 !!describe <name> <text> - saves a description for a sound bite
 !!stop - stop the currently playing sound bite
-!!entrances - toggles whether bot should automatically play a sound bite named after a user whenever that user joins a voice channel
+!!entrance <name(OPTIONAL)> - turn your entrance music on or off. provide a name to set what your entrance music should be.
 !!list - list all sound bites
 ```

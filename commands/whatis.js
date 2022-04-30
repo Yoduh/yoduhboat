@@ -1,5 +1,4 @@
-const metadata = require('../helpers/metadata');
-const util = require('../helpers/util');
+const Sound = require("../db/Sound");
 const { MessageEmbed } = require('discord.js');
 
 const command = async (args, message) => {
@@ -7,7 +6,7 @@ const command = async (args, message) => {
         message.reply("you did not specify a sound name");
         return;
     }
-    let data = metadata.get(args[0]);
+    let data = await Sound.findOne({name: args[0]})
     if (!data) {
         message.reply("cant find a sound by that name, check that it exists by typing !!list");
     } else {
@@ -30,21 +29,16 @@ const command = async (args, message) => {
 }
 
 function createWhatIsEmbed(data) {
-    let start = data.start;
-    if (!start.includes(":")) {
-        if (Number(start) < 10) start = "00:0" + start;
-        else start = "00:" + start;
-    }
     let fieldArray = [
-        { name: 'start:', value: start, inline: true },
+        { name: 'start:', value: data.startTime, inline: true },
         { name: 'duration:', value: data.duration + "s", inline: true },
         { name: 'added by:', value: data.user, inline: true },
-        { name: 'created on:', value: data.created, inline: true }
+        { name: 'created on:', value: new Date(`${data.createdAt}`).toLocaleString(), inline: true }
     ]
     if (data.description == "") data.description = `no description yet! try giving one with\n\`!!describe ${data.name} <text>\``;
-    let link = data.link+`&t=${util.timestampToSeconds(start)}`;
+    let link = data.link+`&t=${data.start}`;
     const whatisEmbed = new MessageEmbed()
-	.setAuthor({ name: `\'${data.name}\' details`, iconURL: 'https://emojipedia-us.s3.amazonaws.com/content/2020/04/05/yt.png', url: data.link+`&t=${util.timestampToSeconds(start)}` })
+	.setAuthor({ name: `\'${data.name}\' details`, iconURL: 'https://emojipedia-us.s3.amazonaws.com/content/2020/04/05/yt.png', url: data.link+`&t=${data.start}` })
 	.setURL(link)
     .setImage(`https://img.youtube.com/vi/${data.link.slice(-11)}/mqdefault.jpg`)
 	.setDescription(data.description+`\n[Youtube link](${link})`)
