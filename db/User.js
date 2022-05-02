@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
     refresh_token: String,
     scope: String,
     token_type: String,
+    favorites: [String],
     createdAt: {
         type: Date,
         immutable: true,

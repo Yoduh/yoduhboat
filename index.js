@@ -44,10 +44,11 @@ const {
 	AudioPlayerStatus,
 } = require('@discordjs/voice');
 const commands = require('./commands');
+const { editEmbed } = require("./commands/list");
 
 // Instantiate a new client with some necessary parameters.
 const client = new Client({
-    intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_VOICE_STATES, Intents.FLAGS.GUILD_MEMBERS],
+    intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_VOICE_STATES, Intents.FLAGS.GUILD_MEMBERS, Intents.FLAGS.GUILD_MESSAGE_REACTIONS],
     fetchAllMembers: true
 });
 
@@ -255,6 +256,18 @@ client.on("messageCreate", async (message) => {
     }
 });
 
+client.on('messageReactionAdd', (reaction, user) => {
+    if (user.bot || !reaction.message.author.bot || reaction.message.embeds.length !== 1) return;
+    let embed = reaction.message.embeds[0];
+    if (!embed.fields[0]?.name.startsWith("Sound Bite List")) {
+        return;
+    }
+
+    let emoji = reaction.emoji.name;
+    reaction.users.remove(reaction.users.cache.filter(u => u === user).first())
+    editEmbed(reaction.message, emoji);
+});
+
 ////////////////////// API code /////////////////////////////
 client.on("apiMessage", async (apiMessage) => {
     let message = {
@@ -338,8 +351,9 @@ app.post('/api/setToken', async (req, res) => {
             Authorization: `Bearer ${req.body.access_token}`
             }
         });
+        let user = null;
         if (tokenResponse.status === 200) {
-            let user = await User.findOneAndUpdate(
+            user = await User.findOneAndUpdate(
                 {userId: tokenResponse.data.id}, // find existing user
                 {                                // user information to update
                     ...req.body,
@@ -349,9 +363,8 @@ app.post('/api/setToken', async (req, res) => {
                 },
                 {upsert: true, new: true}, // options (upsert: create on not found, new: return updated user after transaction)
             )
-            console.log("finding/updating", user);
         }
-        res.sendStatus(tokenResponse.status);
+        res.status(tokenResponse.status).send(user);
     } catch (e) {
         console.log("error in /api/setToken", e);
         res.sendStatus(401);
@@ -401,7 +414,7 @@ app.get('/api/sound', (req, res) => {
 })
 app.get('/api/sounds', async (req, res) => {
     //let guild = req.query.server; // one day when sounds are tied to servers bot will need to get server id from query param
-    let soundData = await Sound.find({}, '-_id -__v');
+    let soundData = await Sound.find({});
     res.send(soundData);
 })
 app.post('/api/channels', async (req, res) => {
@@ -420,8 +433,31 @@ app.post('/api/channels', async (req, res) => {
 
 app.post('/api/add', async (req, res) => {
     let addResponse = await commands.add(req.body.args, null, req.body.username);
-    res.status(addResponse[0])
-    res.send(addResponse[1]);
+    res.status(addResponse[0]).send(addResponse[1]);
+})
+
+app.post('/api/setFavorite', async (req, res) => {
+    let soundId = req.body?.soundId;
+    if (!soundId) {
+        return res.status(401).send('Invalid request format, unable to set favorite');
+    }
+    let userId = JSON.parse(req.headers.authorization).id;
+    let user = await User.findOne({ userId: userId});
+    if (!user) {
+        return res.status(401).send('Can\'t find user to update, try again later');
+    }
+    let favoriteIndex = user.favorites.indexOf(soundId);
+    user.updatedAt = Date.now();
+    if (favoriteIndex === -1) {
+        user.favorites.push(soundId);
+    } else {
+        user.favorites.splice(favoriteIndex, 1);
+    }
+    user.save().then(() => {
+        return res.status(200).send({favorites: user.favorites});
+    }).catch(e => {
+        return res.status(500).send('Error saving favorites, try again later');
+    });
 })
 
 async function validateUser(req) {
