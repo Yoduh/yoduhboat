@@ -115,7 +115,7 @@ app.get('/api/sound', (req, res) => {
 })
 app.get('/api/sounds', async (req, res) => {
     //let guild = req.query.server; // one day when sounds are tied to servers bot will need to get server id from query param
-    let soundData = await Sound.find({});
+    let soundData = await Sound.find({}).sort({name:1});
     return res.send(soundData);
 })
 app.post('/api/channels', async (req, res) => {
@@ -162,7 +162,6 @@ app.post('/api/setFavorite', async (req, res) => {
 })
 
 async function validateUser(req) {
-    console.log("auth", req.headers.authorization);
     let auth = JSON.parse(req.headers.authorization);
     let user = await User.findOne({
         userId: auth.id, 

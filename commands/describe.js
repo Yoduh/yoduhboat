@@ -1,7 +1,6 @@
-const metadata = require('../helpers/metadata');
+const Sound = require("../db/Sound");
 
 const command = async (args, message) => {
-    console.log("we in here");
     if (!args[0]) {
         message.reply("you did not specify a sound name");
         return;
@@ -12,7 +11,11 @@ const command = async (args, message) => {
     }
     let describeName = args.shift();
     let describeText = args.join(" ");
-    let existing = await metadata.get(describeName);
+    let existing = await Sound.findOne({name: describeName});
+    if (!existing) {
+        message.reply("error: could not find a sound with that name");
+        return;
+    }
     if (existing.description !== "") {
         message.channel.send(`Do you want to overwrite this description? \`${existing.description}\` type \`YES\` or \`NO\``).then(() => {
             const filter = m => m.author.id === message.author.id;
@@ -25,7 +28,8 @@ const command = async (args, message) => {
             .then(message => {
                 message = message.first();
                 if (message.content.toUpperCase() == 'YES' || message.content.toUpperCase() == 'Y') {
-                    metadata.updateDescription(describeName, describeText);
+                    existing.description = describeText;
+                    existing.save();
                     message.reply("description updated!");
                 } else if (message.content.toUpperCase() == 'NO' || message.content.toUpperCase() == 'N') {
                     message.channel.send("roger that, description overwrite canceled");
@@ -38,7 +42,8 @@ const command = async (args, message) => {
             });
         })
     } else {
-        metadata.updateDescription(describeName, describeText);
+        existing.description = describeText;
+        existing.save();
         message.reply("description updated!");
     }
     return;
