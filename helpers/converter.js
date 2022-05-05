@@ -13,7 +13,7 @@ const downloadAndConvertVideo = ({
     ffmpeg(ytdl(videoUrl, {filter: 'audioonly'}))
         .toFormat(`${format}`)
         .setStartTime(startTime)
-        .duration(duration)
+        .duration(duration + .1) // adding 100ms seems to prevent slight premature cutoff
         .on('error', (err) => reject(err))
         .on('end', () => resolve(`${filePath}/${title}.${format}`))
         .saveToFile(`${filePath}/${title}.${format}`));

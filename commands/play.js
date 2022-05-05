@@ -4,8 +4,8 @@ const { createReadStream } = require('node:fs');
 const joinCommand = require("./join");
 const Sound = require("../db/Sound");
 
-const command = async (args, isWeb, message, player, queue, subscription) => {
-    if (!isWeb && !message.member.voice.channel) {
+const command = async (args, isWeb, isEntrance, message, masterPlayer) => {
+    if (!isWeb && !isEntrance && !message.member.voice.channel) {
         message.reply("You must first join a voice channel");
         return;
     }
@@ -16,38 +16,36 @@ const command = async (args, isWeb, message, player, queue, subscription) => {
     const soundName = args[0].toLowerCase();
     const soundDb = await Sound.findOne({ name: soundName }).exec();
     if (!soundDb || !fs.existsSync(soundDb.file)) {
-        if (!isWeb) {
+        if (!isWeb && !isEntrance) {
             message.reply("sorry I can't find a sound by that name");
         }
         return;
     }
-    if (player.state.status === 'buffering' || player.state.status === 'playing') {
+    const guildPlayer = masterPlayer.getPlayer(message.guild.id);
+    if (guildPlayer.player.state.status === 'buffering' || guildPlayer.player.state.status === 'playing') {
         let queueItem = {
             args: args,
             isWeb: isWeb,
+            isEntrance: isEntrance,
             message: message
         }
-        queue.push(queueItem);
+        guildPlayer.queue.push(queueItem);
         return;
     }
 
-    // make sure to send to send audio to proper server
-    conn = getVoiceConnection(message.guildId);
-    if (!conn)
-    conn = await joinCommand(message);
-    subscription = conn.subscribe(player);
+    if (!guildPlayer.connection || guildPlayer.connection.joinConfig.channelId !== message.channelId) {
+        await joinCommand(message, masterPlayer);
+    }
     console.log(`playing sound ${isWeb ? 'from web' : ''}`, soundName);
-    // eventually alert server who is playing sound from the website
-    // if (isWeb) {
-    //     getchannel.send("<user> is playing sound via web")
-    // }
     const resource = createAudioResource(createReadStream(soundDb.file), {
         inputType: StreamType.OggOpus,
     });
-    player.play(resource);
-    soundDb.playCount += 1;
-    soundDb.save();
-    return { conn, subscription };
+    guildPlayer.player.play(resource);
+    if (!isEntrance) {
+        soundDb.playCount += 1;
+        soundDb.save();
+    }
+    return;
 }
 
 module.exports = command;

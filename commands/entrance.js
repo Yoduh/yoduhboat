@@ -7,15 +7,15 @@ const command = async (args, message) => {
     let userId = message.member.user.id;
     let user = await User.findOne({userId: userId});
     
-    if (!args[0] && user) { // no sound provided, will just toggle entrance on or off
+    if ((!args[0] && !user) || (!args[0] && user && !user.entrance.sound) ) {
+        message.reply(`you need to provide an entrance sound for me to add with \`!!entrance <sound>\``);
+        return;
+    } else if (!args[0] && user) { // no sound provided, will just toggle entrance on or off
         const toggleEntrance = user.entrance ? !user.entrance.enabled : true;
         user.entrance.enabled = toggleEntrance;
         user.updatedAt = Date.now();
         user.save();
         message.reply(`your entrance music has been toggled ${user.entrance.enabled ? "ON" : "OFF"}`);
-        return;
-    } else if (!args[0] && !user) { // no sound provided and new user, needs to provide one
-        message.reply(`you need to provide an entrance sound for me to add with \`!!entrance <sound>\``);
         return;
     }
     let sound = args[0].toLowerCase();;
