@@ -136,6 +136,15 @@ app.post('/api/add', async (req, res) => {
     let addResponse = await commands.add(req.body.args, null, req.body.username);
     return res.status(addResponse[0]).send(addResponse[1]);
 })
+app.post('/api/remove', async (req, res) => {
+    let removeResponse = await commands.remove([req.query.name]);
+    return res.status(removeResponse[0]).send(removeResponse[1]);
+})
+app.post('/api/update', async (req, res) => {
+    // update for description and/or name -- right now only description
+    let updateResponse = await commands.describe([req.body.details.name, req.body.details.description])
+    return res.status(updateResponse[0]).send(updateResponse[1]);
+})
 
 app.post('/api/setFavorite', async (req, res) => {
     let soundId = req.body?.soundId;

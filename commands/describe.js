@@ -12,11 +12,11 @@ const command = async (args, message) => {
     let describeName = args.shift();
     let describeText = args.join(" ");
     let existing = await Sound.findOne({name: describeName});
-    if (!existing) {
+    if (!existing && message) {
         message.reply("error: could not find a sound with that name");
         return;
     }
-    if (existing.description !== "") {
+    if (existing.description !== "" && message) {
         message.channel.send(`Do you want to overwrite this description? \`${existing.description}\` type \`YES\` or \`NO\``).then(() => {
             const filter = m => m.author.id === message.author.id;
             message.channel.awaitMessages({
@@ -44,7 +44,11 @@ const command = async (args, message) => {
     } else {
         existing.description = describeText;
         existing.save();
-        message.reply("description updated!");
+        if (message) {
+            message.reply("description updated!");
+        } else {
+            return [200, 'Description updated'];
+        }
     }
     return;
 }
