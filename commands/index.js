@@ -1,7 +1,9 @@
 const entranceCommand = require("./entrance");
 const describeCommand = require("./describe");
+const renameCommand = require("./rename");
 const commandsCommand = require("./commands");
 const addCommand = require("./add");
+const updateCommand = require("./update");
 const joinCommand = require("./join");
 const playCommand = require("./play");
 const leaveCommand = require("./leave");
@@ -14,8 +16,10 @@ const trimCommand = require("./trim");
 
 exports.entrance = entranceCommand;
 exports.describe = describeCommand;
+exports.rename = renameCommand;
 exports.commands = commandsCommand;
 exports.add = addCommand;
+exports.update = updateCommand;
 exports.join = joinCommand;
 exports.play = playCommand;
 exports.leave = leaveCommand;

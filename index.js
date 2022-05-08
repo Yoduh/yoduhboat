@@ -94,45 +94,44 @@ client.on("messageCreate", async (message) => {
                 conn = await commands.join(message, masterPlayer);
                 break;
             case "add":
-                commands.add(args, message, false);
+                await commands.add(args, message, false);
                 break;
             case "play":
                 await commands.play(args, false, false, message, masterPlayer);
                 break;
             case "volume":
-                commands.volume(args, message);
-                break;
-            case "trim":
-                // work in progress
-                //commands.trim(args, message); or commands.edit(args, message)
+                await commands.volume(args, message);
                 break;
             case "list":
-                commands.list(message);
+                await commands.list(message);
                 break;
             case "remove":
-                commands.remove(args, message);
+                await commands.remove(args, message);
                 break;
             case "stop":
-                commands.stop(message, masterPlayer);
+                await commands.stop(message, masterPlayer);
                 break;
             case "commands":
-                commands.commands(message);
+                await commands.commands(message);
                 break;
             case "whatis":
-                commands.whatis(args, message);
+                await commands.whatis(args, message);
                 break;
             case "describe":
-                commands.describe(args, message);
+                await commands.describe(args, message);
+                break;
+            case "rename":
+                await commands.rename(args, message);
+                break;
+            case "update":
+                await commands.update(args, message);
                 break;
             case "leave":
-                commands.leave(message, masterPlayer);
+                await commands.leave(message, masterPlayer);
                 break;
             case "entrance":
-                commands.entrance(args, message);
+                await commands.entrance(args, message);
                 break;
-            // case "flip":
-            //     message.reply(Math.random() <= 0.5 ? "heads!" : "tails!");
-            //     break;
             default:
                 await commands.play([command], false, false, message, masterPlayer);
                 break;

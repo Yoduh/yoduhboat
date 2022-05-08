@@ -15,6 +15,8 @@ const command = async (args, message) => {
     if (!existing && message) {
         message.reply("error: could not find a sound with that name");
         return;
+    } else if(!existing) {
+        return [404, 'Can\'t find sound to update, please refresh the site and try again'];
     }
     if (existing.description !== "" && message) {
         message.channel.send(`Do you want to overwrite this description? \`${existing.description}\` type \`YES\` or \`NO\``).then(() => {
@@ -47,7 +49,7 @@ const command = async (args, message) => {
         if (message) {
             message.reply("description updated!");
         } else {
-            return [200, 'Description updated'];
+            return [200, 'Sound updated'];
         }
     }
     return;

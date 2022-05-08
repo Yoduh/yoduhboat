@@ -141,9 +141,28 @@ app.post('/api/remove', async (req, res) => {
     return res.status(removeResponse[0]).send(removeResponse[1]);
 })
 app.post('/api/update', async (req, res) => {
-    // update for description and/or name -- right now only description
-    let updateResponse = await commands.describe([req.body.details.name, req.body.details.description])
-    return res.status(updateResponse[0]).send(updateResponse[1]);
+    if (req.body.newDescription) {
+        let describeResult = await commands.describe([req.body.name, req.body.newDescription])
+        if (describeResult[0] !== 200) {
+            res.status(describeResult[0]).send(describeResult[1]);
+            return;
+        }
+    }
+    if (req.body.newName) {
+        let renameResult = await commands.rename([req.body.name, req.body.newName])
+        if (renameResult[0] !== 200) {
+            res.status(renameResult[0]).send(renameResult[1]);
+            return;
+        }
+    }
+    if (req.body.args) {
+        // this payload is shared with /add endpoint so the unnecessary 'link' arg needs to be removed
+        req.body.args.splice(1, 1);
+        let updateResult = await commands.update(req.body.args);
+        res.status(updateResult[0]).send(updateResult[1]);
+        return;
+    }
+    return res.status(200).send('Sound updated');
 })
 
 app.post('/api/setFavorite', async (req, res) => {
