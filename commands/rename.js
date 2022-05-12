@@ -1,4 +1,5 @@
 const Sound = require("../db/Sound");
+const fs = require('fs');
 
 const command = async (args, message) => {
     if (args.length > 2) {
@@ -22,7 +23,9 @@ const command = async (args, message) => {
     } else if(!existing) {
         return [404, 'Can\'t find sound to update, please refresh the site and try again'];
     }
+    fs.rename(`./sounds/${oldName}.opus`, `./sounds/${newName}.opus`, () => {});
     existing.name = newName;
+    existing.file = `./sounds/${newName}.opus`;
     existing.save();
     if (message) {
         message.reply("sound name updated!");

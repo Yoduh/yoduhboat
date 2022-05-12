@@ -6,7 +6,7 @@ const Sound = require("../db/Sound");
 const fs = require('fs');
 
 // reserved words for commands only
-const commandList = ['join', 'leave', 'add', 'remove', 'play', 'whatis', 'describe', 'stop', 'entrances', 'list', 'volume', 'trim'];
+const commandList = ['join', 'leave', 'add', 'remove', 'play', 'whatis', 'describe', 'stop', 'entrances', 'list', 'volume', 'update', 'rename', 'test'];
 
 const command = async (args, message, webUser) => {
     if (!args[0] && !webUser) {
@@ -48,7 +48,15 @@ const command = async (args, message, webUser) => {
         end = util.timestampToSeconds(args[3]);
         endTime = util.secondsToTimestamp(args[3]);
     } else {
-        end = await ytdl.getInfo(link).then(info => info.videoDetails.lengthSeconds);
+        const COOKIE = 'YSC=RnxgWI6I3-I; VISITOR_INFO1_LIVE=zQ6Xq5z4Mm4; __Secure-3PSID=JQhZWMa7E7fjJFlYuGLO44kOoZdLxA-FLSAdcZzWferpSTwa4DOmjvPh9AcDqcj53cKDBg.; __Secure-3PAPISID=r2UBd9QV57unuHr7/AIZPQic5cceWTPsCN; LOGIN_INFO=AFmmF2swRQIhANz4ah0FgiaNFScwfJOWVV5BWZGdGWzzQoeCQzlGilKBAiAuztNeXZKShIb8lDAJ-6M68udWjr_eNrCNhQfn3_KzOA:QUQ3MjNmeXlHN0NPeklFZ0VmVXlFMGNwSS1LZUxzVXFfMmV0ckYxR01WWDBUYXR6YUhqcDhMTHpsTW01cXBvYWdZdGlhdmhyWmxZTGg4ejg1QUpZbTVDelV4ZGhsdk1HdGQ4ZFlYYkdfX0R5dXhZMnR5TEg2TDZGek9oWktkNTdHcFhzUXBvdTE1bHZINWhsR1NwZm9uSkJNbVlKLWdScTlFWlZ5UFpJU0M5UV9wRzMxMk5WVmI2aGptVWdKZmh1Z21mcTUyYWhsQy02T0J6dU5BNktxXy12SXQ3MUhqVi1rQQ==; PREF=tz=America.New_York&f6=40000000&f5=30000; wide=1; __Secure-3PSIDCC=AJi4QfEWwr3VzFY5t0Lj2X2xMawJtYiv279uBEoJB8RejBazE0qxk4yV_MYySBELyHb4zC6HSQ';
+        const options = {
+            requestOptions: {
+                headers: {
+                cookie: COOKIE
+                },
+            },
+        }
+        end = await ytdl.getInfo(link, options).then(info => info.videoDetails.lengthSeconds);
         endTime = util.secondsToTimestamp(end);
     }
     duration = util.getTimeDifference(start, end);

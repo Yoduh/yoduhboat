@@ -11,7 +11,7 @@ const command = async (args, message) => {
     // delete from mongodb
     let removed = await Sound.findOneAndDelete({ name: fileToRemove })
     if (removed) {
-        // remove sound id from all users favorites
+        // remove sound id from all users favorites (to-do: also remove as entrance music and set entrance enabled to false)
         await User.updateMany({favorites: removed.id}, {
             $pull: {
                 favorites: removed.id
