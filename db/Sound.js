@@ -14,6 +14,10 @@ const soundSchema = new mongoose.Schema({
     endTime: String, // timestamp
     user: String,
     duration: Number,
+    volume: {
+        type: Number,
+        default: 1
+    },
     playCount: {
         type: Number,
         default: 0

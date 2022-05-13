@@ -1,6 +1,7 @@
 const util = require('../helpers/util');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
+const Sound = require("../db/Sound");
 
 const command = async (args, message) => {
     if (!args[0]) {
@@ -13,7 +14,8 @@ const command = async (args, message) => {
         return;
     }
     let vol = args[1]
-    if (!fs.existsSync(`./sounds/${sound}.opus`)) {
+    const dbSound = await Sound.findOne({name: sound});
+    if (!dbSound || !fs.existsSync(`./sounds/${sound}.opus`)) {
         if (!isWeb) {
             message.reply("sorry I can't find a sound by that name");
         }
@@ -21,6 +23,12 @@ const command = async (args, message) => {
     }
     await modifyVolume(sound, vol);
     let volResult = util.replaceTempSound(sound);
+    if (!dbSound.volume || dbSound.volume === '') {
+        dbSound.volume = vol;
+    } else {
+        dbSound.volume *= vol;
+    }
+    dbSound.save();
     if (volResult)
         message.reply(`volume of ${sound} multiplied by ${vol}`);
     else

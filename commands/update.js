@@ -5,7 +5,7 @@ const convertLink = youtubeConverter("./sounds");
 const ytdl = require('ytdl-core');
 const Sound = require("../db/Sound");
 
-const command = async (args, message) => {
+const command = async (args, message, volume = 1) => {
     if (args.length < 2 || args.length > 3) {
         message.reply("incorrect number of arguments, use !!commands for help");
         return;
@@ -64,7 +64,8 @@ const command = async (args, message) => {
         pathToSound = await convertLink(sound.link, {
             startTime: newStart, // from where in the video the sound bite should start
             duration: duration, // Length of sound bite in seconds (from start point)
-            title: soundName // name for sound file
+            title: soundName, // name for sound file
+            volume: volume
         });
     } catch(e) {
         console.log("failed to convert:", e);
@@ -75,6 +76,7 @@ const command = async (args, message) => {
         sound.startTime = newStartTime;
         sound.end = newEnd;
         sound.endTime = newEndTime;
+        sound.volume = volume;
         duration = duration;
         await sound.save();
         if (message) {

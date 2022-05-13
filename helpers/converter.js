@@ -6,11 +6,13 @@ const downloadAndConvertVideo = ({
   videoUrl,
   startTime,
   duration,
+  volume,
   filePath,
   format
 }) =>
   new Promise((resolve, reject) =>
     ffmpeg(ytdl(videoUrl, {filter: 'audioonly'}))
+        .audioFilters([{ filter: 'volume', options: volume }])
         .toFormat(`${format}`)
         .setStartTime(startTime)
         .duration(duration + .1) // adding 100ms seems to prevent slight premature cutoff
@@ -24,6 +26,7 @@ const mergeParams = (videoInfo, params, filePath) => ({
   videoUrl: videoInfo.videoDetails.video_url,
   startTime: params.startTime ?? '00:00:00',
   duration: params.duration ?? videoInfo.videoDetails.lengthSeconds,
+  volume: params.volume ?? 1,
   filePath: filePath ?? __dirname,
   format: params.format ?? 'opus'
 });

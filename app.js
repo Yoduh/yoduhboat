@@ -133,7 +133,7 @@ app.post('/api/channels', async (req, res) => {
 })
 
 app.post('/api/add', async (req, res) => {
-    let addResponse = await commands.add(req.body.args, null, req.body.username);
+    let addResponse = await commands.add(req.body.args, null, req.body.username, req.body.volume);
     return res.status(addResponse[0]).send(addResponse[1]);
 })
 app.post('/api/remove', async (req, res) => {
@@ -158,7 +158,7 @@ app.post('/api/update', async (req, res) => {
     if (req.body.args) {
         // this payload is shared with /add endpoint so the unnecessary 'link' arg needs to be removed
         req.body.args.splice(1, 1);
-        let updateResult = await commands.update(req.body.args);
+        let updateResult = await commands.update(req.body.args, null, req.body.volume);
         res.status(updateResult[0]).send(updateResult[1]);
         return;
     }

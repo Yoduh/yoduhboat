@@ -8,7 +8,7 @@ const fs = require('fs');
 // reserved words for commands only
 const commandList = ['join', 'leave', 'add', 'remove', 'play', 'whatis', 'describe', 'stop', 'entrances', 'list', 'volume', 'update', 'rename', 'test'];
 
-const command = async (args, message, webUser) => {
+const command = async (args, message, webUser, volume = 1) => {
     if (!args[0] && !webUser) {
         message.reply("no name given or command not in proper format.");
         return;
@@ -66,7 +66,8 @@ const command = async (args, message, webUser) => {
         pathToSound = await convertLink(link, {
             startTime: start, // from where in the video the sound bite should start
             duration: duration, // Length of sound bite in seconds (from start point)
-            title: name // name for sound file
+            title: name, // name for sound file
+            volume: volume
         });
     } catch(e) {
         console.log("failed to convert:", e);
@@ -82,7 +83,8 @@ const command = async (args, message, webUser) => {
             end: end,
             endTime: endTime,
             user: webUser ? webUser : message.member.displayName,
-            duration: duration
+            duration: duration,
+            volume: volume
         });
         newSound.save();
         if (webUser) {
