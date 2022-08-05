@@ -1,4 +1,6 @@
 const fs = require('fs');
+const play = require('play-dl');
+const Song = require("../db/Song");
 
 const getTimeDifference = (start, end) => {
     const startInSec = timestampToSeconds(start);
@@ -29,7 +31,6 @@ const secondsToTimestamp = (seconds) => {
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
         const s = Math.floor(seconds % 60);
-        const ms = Math.round((seconds - Math.floor(seconds)) * 100);
         let res = [
         h > 0 ? h : '',
         h > 0 && m <= 9 ? '0' + m : m || '0',
@@ -37,21 +38,91 @@ const secondsToTimestamp = (seconds) => {
         ]
         .filter(Boolean)
         .join(':');
-        res += '.' + (ms > 9 ? ms : '0' + ms);
         return res;
     }
 }
-const replaceTempSound = (oldSound) => {
-    const newSound = oldSound+"__TEMP";
-    if (!fs.existsSync(`./sounds/${newSound}.opus`)) {
-        return false;
+
+const getSongDetails = async (songLink, message) => {
+    let song = null;
+    // YOUTUBE
+    if (songLink.includes("youtu")) {
+        const songInfo = await play.video_info(songLink)
+        song = new Song({
+            title: songInfo.video_details.title,
+            link: songInfo.video_details.url,
+            source: "youtube",
+            duration: songInfo.video_details.durationInSec,
+            durationTime: songInfo.video_details.durationRaw,
+            addedBy: message.member.user.username,
+            // for web
+            thumbnail: songInfo.video_details?.thumbnails[0].url,
+            avatar: `https://cdn.discordapp.com/avatars/${message.member.user.id}/${message.member.user.avatar}.png`,
+        });
+        return song;
+    } 
+    // SPOTIFY
+    else if (songLink.includes("spotify")) {
+        if (play.is_expired()) {
+            await play.refreshToken();
+        }
+        const songInfo = await play.spotify(songLink);
+        song = new Song({
+            title: songInfo.name,
+            artist: songInfo.artists[0].name,
+            link: songInfo.url,
+            source: "spotify",
+            duration: songInfo.durationInSec,
+            durationTime: secondsToTimestamp(songInfo.durationInSec),
+            addedBy: message.member.user.username,
+            // for web
+            thumbnail: songInfo.thumbnail.url,
+            avatar: `https://cdn.discordapp.com/avatars/${message.member.user.id}/${message.member.user.avatar}.png`
+        });
     }
-    fs.unlinkSync(`./sounds/${oldSound}.opus`)
-    fs.renameSync(`./sounds/${newSound}.opus`, `./sounds/${oldSound}.opus`);
-    return true;
+    return song;
 }
+
+const pushSongToPlaylist = async (songLink, message, userPlaylist) => {
+    // add multiple songs if link is a playlist
+    let songlist = [];
+    let playlist = null;
+    if (songLink.includes("list=")) {
+        playlist = await play.playlist_info(songLink, { incomplete : true });
+        songlist = playlist.videos;
+    } else if(songLink.includes("/playlist/")) {
+        if (play.is_expired()) {
+            await play.refreshToken()
+        }
+        playlist = await play.spotify(songLink);
+        songlist = playlist.fetched_tracks.values().next().value;
+    }
+    if (songlist.length > 0) {
+        const songlistDetails = await Promise.all(songlist.map(async s => { 
+            let song = await getSongDetails(s.url, message);
+            userPlaylist.duration += song.duration;
+            return await song.save();
+        }));
+        userPlaylist.songs.push(...songlistDetails);
+        await userPlaylist.save();
+        return songlistDetails;
+    }
+
+    // add single song
+    let song = await getSongDetails(songLink, message);
+    if (!song) {
+        message.reply("Error fetching song, try again later");
+        return;
+    }
+    await song.save();
+    userPlaylist.songs.push(song);
+    userPlaylist.duration += song.duration;
+    await userPlaylist.save();
+    return song;
+}
+
 
 exports.getTimeDifference = getTimeDifference;
 exports.timestampToSeconds = timestampToSeconds;
-exports.replaceTempSound = replaceTempSound;
 exports.secondsToTimestamp = secondsToTimestamp;
+exports.getSongDetails = getSongDetails;
+exports.pushSongToPlaylist = pushSongToPlaylist;

@@ -8,7 +8,11 @@ const userSchema = new mongoose.Schema({
     refresh_token: String,
     scope: String,
     token_type: String,
-    favorites: [String],
+    playlists: {
+        type: [mongoose.Schema.Types.ObjectId],
+        ref: 'Playlist',
+        default: []
+    },
     createdAt: {
         type: Date,
         immutable: true,
@@ -17,16 +21,6 @@ const userSchema = new mongoose.Schema({
     updatedAt: {
         type: Date,
         default: () => Date.now()
-    },
-    entrance: {
-        enabled: {
-            type: Boolean,
-            default: false
-        },
-        sound: {
-            type: String,
-            default: null
-        }
     }
 })
 

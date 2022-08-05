@@ -1,8 +1,9 @@
-const command = async (message, masterPlayer) => {
-    let guildPlayer = masterPlayer.getPlayer(message.guildId);
-    guildPlayer.queue = [];
+const command = async (message, guildPlayer) => {
+    guildPlayer.queue.length = 0;
     guildPlayer.player.stop();
-    message.reply("player stopped");
+    guildPlayer.isPlaying = false;
+    message.channel.send("player stopped");
+    return true;
 }
 
 module.exports = command;

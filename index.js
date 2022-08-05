@@ -1,7 +1,13 @@
 require('dotenv').config();
-const app = require('./app');
+const { API } = require('./app');
 const Player = require('./Player');
+const Guild = require("./db/Guild");
+const User = require("./db/User");
 const emitter = require('./helpers/emitter');
+const mongoose = require("mongoose");
+const { updateWebClients } = require ("./Websocket");
+mongoose.connect("mongodb://localhost/music");
+
 ////////////////////// Logging Setup //////////////////////
 const { createLogger, format, transports } = require('winston');
 const logger = createLogger({
@@ -28,28 +34,30 @@ if (process.env.NODE_ENV !== 'production') {
         )
     }));
 }
-////////////////////// Bloop Bot //////////////////////////
 const fs = require('fs');
 const { Client, Intents } = require('discord.js');
+console.log
 const commands = require('./commands');
-const { editEmbed } = require("./commands/list");
+// const { editEmbed } = require("./commands/list");
 
 const client = new Client({
-    intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_VOICE_STATES, Intents.FLAGS.GUILD_MEMBERS, Intents.FLAGS.GUILD_MESSAGE_REACTIONS],
+    intents: [
+        Intents.FLAGS.GUILDS,
+        Intents.FLAGS.GUILD_MESSAGES,
+        Intents.FLAGS.GUILD_VOICE_STATES,
+        Intents.FLAGS.GUILD_MEMBERS,
+        Intents.FLAGS.GUILD_MESSAGE_REACTIONS
+    ],
     fetchAllMembers: true
 });
 
-const prefix = "!!";
+const prefix = ".";
 const yoduhId = '200809303907631104';
-let masterPlayer = null;
+global.masterPlayer = null;
 
 try {
 	client.login(process.env.DISCORD_TOKEN);
 	console.log("logged in successfully");
-    // first time initialization
-    if (!fs.existsSync("./sounds")) {
-        fs.mkdirSync("./sounds");
-    }
 } catch(err) {
 	console.log(err);
 }
@@ -60,6 +68,10 @@ client.on("ready", () => {
         client.emit("api/play", body);
     })
     console.log("bot is online");
+    API(client, masterPlayer);
+    client.user.setActivity("music | .commands", {
+        type: "PLAYING"
+    });
 });
 
 client.on("error", (e, message) => {
@@ -81,99 +93,129 @@ process.on('unhandledRejection', (error) => {
     console.error('Unhandled promise rejection:', error);
 });
 
+client.on('guildCreate', async (guild) => {
+    await Guild.create({
+        name: guild.name,
+        guildId: guild.id
+    })
+});
+
+client.on('guildDelete', async (guild) => {
+    await Guild.deleteOne({
+        guildId: guild.id
+    })
+});
+
 client.on("messageCreate", async (message) => {
 	if (!message.content.startsWith(prefix) || message.author.bot) return;
-
 	const commandBody = message.content.slice(prefix.length);
-	const args = commandBody.split(' ');
+	const args = commandBody.split(/\s+/);
 	const command = args.shift().toLowerCase();
     console.log("command = ", command);
+
+    let dbGuild = await Guild.findOne({guildId: message.guildId}).exec();
+    if (command !== "musicchannel" && dbGuild?.allowedChannels.length > 0 && !dbGuild.allowedChannels.includes(message.channel.id)) {
+        let channels = dbGuild.allowedChannels.map(id => {
+            let c = message.guild.channels.cache.get(id);
+            return c.toString();
+        });
+		message.reply(`Wrong channel! Try the ${channels[0]} channel instead`).then(r => {
+			setTimeout(() => {
+		        message.delete();
+                r.delete()
+            }, 10000);
+		}).catch(console.error);
+		return;
+	}
+    
+    const guildPlayer = masterPlayer.getPlayer(message.guild.id);
+    guildPlayer.responseChannel = message.channel;
+    const user = await User.findOneAndUpdate({userId: message.member.user.id}, {
+        userId: message.member.user.id,
+        username: message.member.user.username
+    }, { upsert: true, new: true });
+    let result = false;
     try {
         switch(command) {
             case "join":
-                conn = await commands.join(message, masterPlayer);
-                break;
-            case "add":
-                await commands.add(args, message, false);
+                conn = await commands.join(message, guildPlayer);
                 break;
             case "play":
-                await commands.play(args, false, false, message, masterPlayer);
+                result = await commands.play(args, false, message, guildPlayer, false);
                 break;
-            case "volume":
-                await commands.volume(args, message);
-                break;
-            case "list":
-                await commands.list(message);
+            case "playnext":
+                result = await commands.play(args, false, message, guildPlayer, true);
                 break;
             case "remove":
-                await commands.remove(args, message);
+                await commands.remove(args, message, guildPlayer);
                 break;
             case "stop":
-                await commands.stop(message, masterPlayer);
+                result = await commands.stop(message, guildPlayer);
+                break;
+            case "pause":
+                result = await commands.pause(message, guildPlayer);
+                break;
+            case "unpause":
+                await commands.pause(message, guildPlayer);
+                break;
+            case "skip":
+                await commands.skip(message, guildPlayer);
+                break;
+            case "shuffle":
+                await commands.shuffle(message, guildPlayer);
+                break;
+            case "current":
+                await commands.current(message, guildPlayer);
+                break;
+            case "queue":
+                await commands.queue(args, message, guildPlayer);
                 break;
             case "commands":
                 await commands.commands(message);
                 break;
-            case "whatis":
-                await commands.whatis(args, message);
-                break;
-            case "describe":
-                await commands.describe(args, message);
-                break;
-            case "rename":
-                await commands.rename(args, message);
-                break;
-            case "update":
-                await commands.update(args, message);
-                break;
             case "leave":
-                await commands.leave(message, masterPlayer);
+                await commands.leave(guildPlayer);
                 break;
-            case "entrance":
-                await commands.entrance(args, message);
+            case "musicchannel":
+                await commands.channel(args, message);
+                break;
+            case "playlist":
+                await commands.playlist(args, message, user);
+                break;
+            case "seek":
+                await commands.seek(guildPlayer);
                 break;
             default:
-                await commands.play([command], false, false, message, masterPlayer);
+                message.reply("I do not recognize that command")
                 break;
+        }
+        if (result) {
+            updateWebClients(command, message.guild.id, guildPlayer);
         }
     } catch(e) {
         client.emit('error', e, message)
     }
 });
 
-client.on('messageReactionAdd', (reaction, user) => {
-    if (user.bot || !reaction.message.author.bot || reaction.message.embeds.length !== 1) return;
-    let embed = reaction.message.embeds[0];
-    if (!embed.fields[0]?.name.startsWith("Sound Bite List")) {
-        return;
-    }
-
-    let emoji = reaction.emoji.name;
-    reaction.users.remove(reaction.users.cache.filter(u => u === user).first())
-    editEmbed(reaction.message, emoji);
-});
-
-client.on("api/play", async (apiMessage) => {
-    let message = {
-        guildId: apiMessage.guildId,
-        member: { voice: { channel: {id: apiMessage.channelId}}},
-        guild: { 
-            id: apiMessage.guildId,
-            voiceAdapterCreator: client.guilds.cache.get(apiMessage.guildId).voiceAdapterCreator
-         },
-    }
-    await commands.play([apiMessage.name], true, false, message, masterPlayer);
-    let webChannel = client.guilds.cache.get(apiMessage.guildId).channels.cache.find(c => c.name === 'soundboard' && c.type === 'GUILD_TEXT');
-    if (webChannel) {
-        let webhooks = await webChannel.fetchWebhooks();
-        if (webhooks) {
-            webhooks.first().send({
-                content: `!!${apiMessage.name}`,
-                username: apiMessage.username,
-                avatarURL: `https://cdn.discordapp.com/avatars/${apiMessage.userId}/${apiMessage.userAvatar}.jpg`
-            })
-        }
-    }
-});
-
-app(client);
+// client.on("api/play", async (apiMessage) => {
+//     let message = {
+//         guildId: apiMessage.guildId,
+//         member: { voice: { channel: {id: apiMessage.channelId}}},
+//         guild: { 
+//             id: apiMessage.guildId,
+//             voiceAdapterCreator: client.guilds.cache.get(apiMessage.guildId).voiceAdapterCreator
+//          },
+//     }
+//     await commands.play([apiMessage.name], true, false, message, masterPlayer);
+//     let webChannel = client.guilds.cache.get(apiMessage.guildId).channels.cache.find(c => c.name === 'soundboard' && c.type === 'GUILD_TEXT');
+//     if (webChannel) {
+//         let webhooks = await webChannel.fetchWebhooks();
+//         if (webhooks) {
+//             webhooks.first().send({
+//                 content: `;${apiMessage.name}`,
+//                 username: apiMessage.username,
+//                 avatarURL: `https://cdn.discordapp.com/avatars/${apiMessage.userId}/${apiMessage.userAvatar}.jpg`
+//             })
+//         }
+//     }
+// });

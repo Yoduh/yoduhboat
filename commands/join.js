@@ -1,6 +1,6 @@
 const { joinVoiceChannel } = require('@discordjs/voice');
 
-const command = async (message, masterPlayer) => {
+const command = async (message, guildPlayer) => {
     if (!message.member?.voice?.channel?.id) {
         message.reply("You must first join a voice channel!");
         return;
@@ -10,9 +10,8 @@ const command = async (message, masterPlayer) => {
         guildId: message.guild.id,
         adapterCreator: message.guild.voiceAdapterCreator
     });
-    let joinedPlayer = masterPlayer.getPlayer(message.guild.id);
-    joinedPlayer.connection = conn;
-    joinedPlayer.connection.subscribe(joinedPlayer.player);
+    guildPlayer.connection = conn;
+    guildPlayer.connection.subscribe(guildPlayer.player);
     return conn;
 }
 

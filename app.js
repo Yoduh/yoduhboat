@@ -4,31 +4,26 @@ const axios = require('axios');
 const emitter = require('./helpers/emitter');
 const mongoose = require("mongoose");
 const User = require("./db/User");
-const Sound = require("./db/Sound");
-mongoose.connect("mongodb://localhost/bloop");
+mongoose.connect("mongodb://localhost/music");
 const commands = require('./commands');
+const debounce = require('debounce')
 let client = null;
 
-const API = function(_client) {
+const API = function(_client, masterPlayer) {
 client = _client;
 const app = express();
-const PORT = process.env.PORT || 3001;
-
+const PORT = process.env.HTTP_PORT || 4001;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
+let debounceTimer;
 
 var corsOptions = {
-    origin: ['http://localhost:3000', 'https://bloopbot.netlify.app'],
+    origin: ['http://127.0.0.1:5173', 'https://yoduhboat.netlify.app', 'https://localhost:443'],
     optionsSuccessStatus: 200
 }
-
 app.use(cors(corsOptions));
-app.use(express.static(__dirname + '/sounds'));
 
 app.post('/api/getToken', async (req, res) => {
-    if (corsOptions.origin.includes(req.headers.referer))
-    return res.send("unauthorized origin");
-
     const params = new URLSearchParams();
       params.append('client_id', process.env.DISCORD_CLIENT_ID);
       params.append('client_secret', process.env.DISCORD_CLIENT_SECRET);
@@ -43,6 +38,8 @@ app.post('/api/getToken', async (req, res) => {
           }
         }).then(result => {
             return res.send(result.data);
+        }).catch(e => {
+            console.log('getToken error', e)
         })
 });
 
@@ -86,109 +83,6 @@ app.use(async (req, res, next) => {
     next();
 })
 
-app.post('/api/play', (req, res) => {
-    if (client.guilds.cache.get(req.body.guildId).channels.cache.get(req.body.channelId).members.size === 0) {
-        return res.status(405).json({ message: "Can't send sound bite to empty voice channel!" });
-    }
-    emitter.emit("api/play", req.body);
-    return res.sendStatus(200);
-})
-
-app.post('/api/servers', (req, res) => {
-    let botGuilds = client.guilds.cache.map(g => g.id);
-    let userGuilds = req.body.guilds;
-    let matchingGuilds = userGuilds.filter(g => botGuilds.includes(g));
-    return res.send(matchingGuilds);
-})
-app.get('/api/sound', (req, res) => {
-    let soundRequest = req.query.name;
-    try {
-        let soundBytes = fs.readFileSync(`./sounds/${soundRequest}.opus`);
-        return res.send(soundBytes);
-        // const filePath = resolve(`./sounds/${soundRequest}.opus`);
-        // res.sendFile(filePath)
-    } catch(e) {
-        console.log(e);
-        return res.sendStatus(404);
-    }
-
-})
-app.get('/api/sounds', async (req, res) => {
-    //let guild = req.query.server; // one day when sounds are tied to servers bot will need to get server id from query param
-    let soundData = await Sound.find({}).sort({name:1});
-    return res.send(soundData);
-})
-app.post('/api/channels', async (req, res) => {
-    let channels = client.guilds.cache.get(req.body.guildId).channels.cache
-    let guild = await client.guilds.fetch(req.body.guildId);
-    let user = await guild.members.fetch(req.body.userId);
-
-    let result = [];
-    channels.forEach(c => {
-        if(c.type === "GUILD_VOICE" && user.permissionsIn(c).has("CONNECT")) {
-            result.push({id: c.id, name: c.name})
-        }
-    })
-    return res.send(result);
-})
-
-app.post('/api/add', async (req, res) => {
-    let addResponse = await commands.add(req.body.args, null, req.body.username, req.body.volume);
-    return res.status(addResponse[0]).send(addResponse[1]);
-})
-app.post('/api/remove', async (req, res) => {
-    let removeResponse = await commands.remove([req.query.name]);
-    return res.status(removeResponse[0]).send(removeResponse[1]);
-})
-app.post('/api/update', async (req, res) => {
-    if (req.body.newDescription) {
-        let describeResult = await commands.describe([req.body.name, req.body.newDescription])
-        if (describeResult[0] !== 200) {
-            res.status(describeResult[0]).send(describeResult[1]);
-            return;
-        }
-    }
-    if (req.body.newName) {
-        let renameResult = await commands.rename([req.body.name, req.body.newName])
-        if (renameResult[0] !== 200) {
-            res.status(renameResult[0]).send(renameResult[1]);
-            return;
-        }
-    }
-    if (req.body.args) {
-        // this payload is shared with /add endpoint so the unnecessary 'link' arg needs to be removed
-        req.body.args.splice(1, 1);
-        let updateResult = await commands.update(req.body.args, null, req.body.volume);
-        res.status(updateResult[0]).send(updateResult[1]);
-        return;
-    }
-    return res.status(200).send('Sound updated');
-})
-
-app.post('/api/setFavorite', async (req, res) => {
-    let soundId = req.body?.soundId;
-    if (!soundId) {
-        return res.status(401).send('Invalid request format, unable to set favorite');
-    }
-    let userId = JSON.parse(req.headers.authorization).id;
-    let user = await User.findOne({ userId: userId});
-    if (!user) {
-        return res.status(401).send('Can\'t find user to update, try again later');
-    }
-    let favoriteIndex = user.favorites.indexOf(soundId);
-    user.updatedAt = Date.now();
-    if (favoriteIndex === -1) {
-        user.favorites.push(soundId);
-    } else {
-        user.favorites.splice(favoriteIndex, 1);
-    }
-    user.save().then(() => {
-        return res.status(200).send({favorites: user.favorites});
-    }).catch(e => {
-        return res.status(500).send('Error saving favorites, try again later');
-    });
-})
-
 async function validateUser(req) {
     let auth = JSON.parse(req.headers.authorization);
     let user = await User.findOne({
@@ -198,9 +92,46 @@ async function validateUser(req) {
     return !!user;
 }
 
+app.post('/api/servers', (req, res) => {
+    let botGuilds = client.guilds.cache.map(g => g.id);
+    let userGuilds = req.body.guilds;
+    let matchingGuilds = userGuilds.filter(g => botGuilds.includes(g));
+    return res.send(matchingGuilds);
+})
+
+const playerForceStart = (guildPlayer) => {
+    guildPlayer.forceStart();
+}
+let debounceStart = debounce(playerForceStart, 500);
+app.post('/api/remove', async (req, res) => {
+    const guildPlayer = masterPlayer.getPlayer(req.body.guild);
+    try {
+        let removeResponse = await commands.remove(req.body.songId, null, guildPlayer, true);
+        return res.status(200).send(removeResponse);
+    } catch(e) {
+        return res.sendStatus(500)
+    } finally {
+        // debounce to allow enough time for player to stop and handle possibly more remove first song requests
+        if (guildPlayer.songRemoving) {
+            debounceStart(guildPlayer);
+        }
+    }
+});
+
+app.post('/api/pause', async (req, res) => {
+    console.log('pause endpoint hit')
+    const guildPlayer = masterPlayer.getPlayer(req.body.guild);
+    try {
+        await commands.pause(null, guildPlayer);
+        return res.status(200).send(guildPlayer.player.state.status);
+    } catch(e) {
+        return res.sendStatus(500)
+    }
+})
+
 app.listen(PORT, () => {
     console.log(`Now listening to requests on port ${PORT}`);
 });
 }
 
-module.exports = API;
+exports.API = API;

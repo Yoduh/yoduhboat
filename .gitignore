@@ -2,3 +2,7 @@
 /node_modules
 /sounds
 /descriptions.json
+.env*
+/.data
+invite-link.txt
+bloop-info.log
