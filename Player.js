@@ -1,6 +1,6 @@
 const play = require('play-dl');
 const { createAudioResource } = require('@discordjs/voice');
-const { broadcastDoneSong } = require('./Websocket');
+const { broadcastDoneSong, updateWebClients } = require('./Websocket');
 
 // do NOT clear queue by setting it to an empty array because it'll get rid of this...
 const eventify = function(arr, callback) {
@@ -19,7 +19,6 @@ const eventify = function(arr, callback) {
 //     }
 // });
 
-
 const {
 	createAudioPlayer,
 	AudioPlayerStatus,
@@ -33,9 +32,22 @@ module.exports = class Player {
         this.client.on("voiceStateUpdate", this.voiceStateUpdate.bind(this));
     }
 
+    // if user joins/leaves a channel and there is a ws.id matching user.id, need to ws.send(voiceChannel: null)
     voiceStateUpdate = async (oldState, newState) => {
         const guildPlayer = this.getPlayer(oldState.guild.id);
-        if (!guildPlayer || newState.guild.afkChannelId === newState.channelId || newState.member.user.bot) return;
+        if (!guildPlayer || newState.guild.afkChannelId === newState.channelId) return;
+        if (newState.member.user.id === newState.guild.me.id) {
+            guildPlayer.voiceChannel = newState.channel ? { id: newState.channel.id, name: newState.channel.name } : null;
+            // inform listening websockets of new bot voice channel
+            updateWebClients('join', newState.guild.id, guildPlayer);
+            return;
+        } 
+        if(newState.member.user.bot) return;
+        // inform specific websocket if their matching user has joined a new voice channel
+        let ws = [...wss.clients].find(ws => ws.id === newState.member.user.id )
+        if (ws) {
+            ws.send(JSON.stringify({ userVoiceId: newState.channelId }))
+        }
 
         if (guildPlayer.timeout && newState?.channelId && newState.channelId === newState.guild?.me?.voice?.channelId) {
             clearTimeout(guildPlayer.timeout) //If user is joining bot's channel, remove idle timer if it exists
@@ -43,7 +55,7 @@ module.exports = class Player {
             return;
         }
         if (oldState.channelId !== oldState.guild.me.voice.channelId || !oldState.channel){
-            return(0); //If user didn't leave bot's channel
+            return; //If user left channel that wasn't bot's channel... don't care
         }
         if(oldState.channel.members.filter(m => !m.user.bot).size === 0 && guildPlayer.connection){
             if (guildPlayer.player.state.status === 'playing' && guildPlayer.responseChannel) {
@@ -72,6 +84,7 @@ module.exports = class Player {
         }
         const guildPlayer = {
             guildId: guild.id,
+            voiceChannel: null,
             responseChannel: null,
             player: createAudioPlayer(),
             queue: [],
@@ -80,12 +93,36 @@ module.exports = class Player {
             timeout: null,
             isPlaying: false,
             songRemoving: false,
+            socketListeners: new Set(),
+            broadcaster: null
         }
         guildPlayer.forceStart = () => {
-            console.log('forcing start')
+            console.log('forcing start');
             guildPlayer.songRemoving = false;
-            this.playTrack(guildPlayer.queue[0], guildPlayer)
+            if (guildPlayer.currentStream) {    // if resource stream exists, we didn't remove while in pause state, so play immediately
+                this.playTrack(guildPlayer.queue[0], guildPlayer)
+                guildPlayer.broadcastSync();
+            }
         }
+        guildPlayer.broadcastSync = () => {
+            if (!guildPlayer.broadcaster) {
+                guildPlayer.broadcaster = setInterval(() => {
+                    if (guildPlayer.socketListeners.size > 0 && !guildPlayer.songRemoving) {
+                        console.log('Player is sending sync update', guildPlayer.currentStream.playbackDuration)
+                        updateWebClients('sync', guildPlayer.guildId, guildPlayer)
+                    }
+                }, 3000);
+            }
+        }
+        guildPlayer.player.on(AudioPlayerStatus.Playing, async () => {
+            guildPlayer.broadcastSync()
+        }),
+        guildPlayer.player.on(AudioPlayerStatus.Paused, async () => {
+            console.log('pause state')
+            if (guildPlayer.broadcaster) {
+                guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
+            }
+        }),
         guildPlayer.player.on(AudioPlayerStatus.Idle, async () => {
             if (guildPlayer.songRemoving) {
                 console.log("song removal from web is going on, waiting for force start...");
@@ -108,6 +145,7 @@ module.exports = class Player {
                 }
             } else {
                 console.log("queue is empty.  isPlaying = false");
+                clearInterval(guildPlayer.broadcaster);
                 guildPlayer.isPlaying = false;
             }
         });
@@ -136,6 +174,7 @@ module.exports = class Player {
     }
 
     async playTrack(args, guildPlayer) {
+        console.log('playTrack()')
         guildPlayer.isPlaying = true;
         let song = args.song;
         let isWeb = args.isWeb;

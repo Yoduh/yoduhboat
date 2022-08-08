@@ -5,7 +5,7 @@ const util = require('../helpers/util');
 const command = async (message, guildPlayer) => {
     if (guildPlayer && ['playing', 'paused'].includes(guildPlayer.player.state.status)) {
         const queueItem = guildPlayer.queue[0];
-        const embed = await youtubeEmbed(queueItem.song, guildPlayer.player.state.playbackDuration)
+        const embed = await youtubeEmbed(queueItem.song, guildPlayer.currentStream.playbackDuration)
         message.channel.send({ embeds: [embed]})
     } else {
         message.channel.send("No music is currently playing")

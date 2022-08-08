@@ -11,8 +11,14 @@ const command = async (args, message, guildPlayer, isWeb) => {
         const index = guildPlayer.queue.findIndex(q => q.song._id.toString() === songId);
         if (index === 0) {
             guildPlayer.songRemoving = true;
+            guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
             // this takes < 500ms. dont forceStart (which sets songRemoving back to false) before the stop finishes (i.e. debounce!)
-            guildPlayer.player.stop();
+            let force = false;
+            if (guildPlayer.player.state.status === 'paused') {
+                guildPlayer.currentStream = null
+                force = true;
+            }
+            guildPlayer.player.stop(force);  // force destroy playing resource if paused
         }
         guildPlayer.queue.splice(index, 1);
         return true;

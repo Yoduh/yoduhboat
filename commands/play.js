@@ -121,7 +121,9 @@ const pushSongToQueue = async (songLink, message, isWeb, guildPlayer, isNext) =>
     // add single song
     let song = await util.getSongDetails(songLink, message);
     if (!song) {
-        message.reply("Error fetching song, try again later");
+        const err = "Error fetching song, try again later";
+        if (isWeb) return err
+        message.reply(err);
         return false;
     }
     let queueItem = {
@@ -134,7 +136,7 @@ const pushSongToQueue = async (songLink, message, isWeb, guildPlayer, isNext) =>
     } else {
         guildPlayer.queue.push(queueItem);
     }
-    message.channel.send(`Added **${queueItem.song.artist ? queueItem.song.artist + ' - ': ''}${queueItem.song.title}** to queue`)
+    if (!isWeb) message.channel.send(`Added **${queueItem.song.artist ? queueItem.song.artist + ' - ': ''}${queueItem.song.title}** to queue`)
     return true;
 }
 

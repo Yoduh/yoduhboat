@@ -3,10 +3,12 @@ const cors = require('cors');
 const axios = require('axios');
 const emitter = require('./helpers/emitter');
 const mongoose = require("mongoose");
+const play = require('play-dl');
 const User = require("./db/User");
 mongoose.connect("mongodb://localhost/music");
 const commands = require('./commands');
 const debounce = require('debounce')
+const { updateWebClients } = require ("./Websocket");
 let client = null;
 
 const API = function(_client, masterPlayer) {
@@ -15,7 +17,6 @@ const app = express();
 const PORT = process.env.HTTP_PORT || 4001;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
-let debounceTimer;
 
 var corsOptions = {
     origin: ['http://127.0.0.1:5173', 'https://yoduhboat.netlify.app', 'https://localhost:443'],
@@ -111,7 +112,7 @@ app.post('/api/remove', async (req, res) => {
     } catch(e) {
         return res.sendStatus(500)
     } finally {
-        // debounce to allow enough time for player to stop and handle possibly more remove first song requests
+        // debounce to allow enough time for player to stop and handle possibly more 'remove first song' requests
         if (guildPlayer.songRemoving) {
             debounceStart(guildPlayer);
         }
@@ -122,16 +123,90 @@ app.post('/api/pause', async (req, res) => {
     console.log('pause endpoint hit')
     const guildPlayer = masterPlayer.getPlayer(req.body.guild);
     try {
-        await commands.pause(null, guildPlayer);
+        // if current song removed while paused, player will not have a resource and need to issue playTrack() instead of pause()
+        if (guildPlayer.player.state.resource) {
+            console.log('toggling pause');
+            await commands.pause(null, guildPlayer);
+        } else if (guildPlayer.queue.length > 0) {
+            console.log('manually playing next track')
+            const item = guildPlayer.queue[0];
+            masterPlayer.playTrack(item, guildPlayer);
+        }
+        // doesn't work
+        // if (oldState === 'paused') {
+        //   guildPlayer.player.pause();
+        // }
         return res.status(200).send(guildPlayer.player.state.status);
     } catch(e) {
         return res.sendStatus(500)
     }
 })
 
+app.post('/api/seek', async (req, res) => {
+    const guildPlayer = masterPlayer.getPlayer(req.body.guild);
+    try {
+        await commands.seek(req.body.seekTime, guildPlayer);
+        return res.sendStatus(200);
+    } catch(e) {
+        return res.sendStatus(500);
+    }
+})
+
+app.post('/api/search', async (req, res) => {
+    const results = await play.search(`${req.body.text}`, {
+        limit: 10
+    });
+    const formattedResults = results.map(r => (
+        ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }) => 
+        ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }))(r))
+    res.status(200).send(formattedResults);
+})
+
+app.post('/api/addSong', async (req, res) => {
+    const guildId = req.body.guild;
+    const userId = req.body.user;
+    const url = req.body.url;
+    const message = await generateFakeMessage(userId, guildId)
+    console.log('message', message);
+    console.log('url', url);
+    const guildPlayer = masterPlayer.getPlayer(req.body.guild);
+    try {
+        await commands.play([url], true, message, guildPlayer, false);
+        const newSong = guildPlayer.queue[guildPlayer.queue.length - 1].song;
+        console.log('song added', newSong);
+        return res.status(200).send(JSON.stringify({ song: newSong }));
+    } catch(e) {
+        console.log('e', e)
+        return res.sendStatus(500);
+    }
+})
+
 app.listen(PORT, () => {
     console.log(`Now listening to requests on port ${PORT}`);
 });
+}
+
+async function generateFakeMessage(userId, guildId) {
+    const guild = await masterPlayer.client.guilds.fetch(guildId); // Getting the guild.
+    const member = await guild.members.fetch(userId); // Getting the member.
+    const message = {
+        member: {
+            user: {
+                id: member.user.id,
+                avatar: member.user.avatar
+            },
+            voice: {
+                channel: {
+                    id: member.voice.channel.id
+                }
+            }
+        },
+        guild: {
+            id: guild.id,
+            voiceAdapterCreator: guild.voiceAdapterCreator
+        }
+    }
+    return message;
 }
 
 exports.API = API;

@@ -5,7 +5,7 @@ const Guild = require("./db/Guild");
 const User = require("./db/User");
 const emitter = require('./helpers/emitter');
 const mongoose = require("mongoose");
-const { updateWebClients } = require ("./Websocket");
+const { updateWebClients, wssStart } = require ("./Websocket");
 mongoose.connect("mongodb://localhost/music");
 
 ////////////////////// Logging Setup //////////////////////
@@ -61,14 +61,14 @@ try {
 } catch(err) {
 	console.log(err);
 }
-
-client.on("ready", () => {
+client.on("ready", async () => {
     masterPlayer = new Player(client);
     emitter.on('api/play', (body) => {
         client.emit("api/play", body);
     })
     console.log("bot is online");
     API(client, masterPlayer);
+    wssStart();
     client.user.setActivity("music | .commands", {
         type: "PLAYING"
     });
@@ -196,26 +196,3 @@ client.on("messageCreate", async (message) => {
         client.emit('error', e, message)
     }
 });
-
-// client.on("api/play", async (apiMessage) => {
-//     let message = {
-//         guildId: apiMessage.guildId,
-//         member: { voice: { channel: {id: apiMessage.channelId}}},
-//         guild: { 
-//             id: apiMessage.guildId,
-//             voiceAdapterCreator: client.guilds.cache.get(apiMessage.guildId).voiceAdapterCreator
-//          },
-//     }
-//     await commands.play([apiMessage.name], true, false, message, masterPlayer);
-//     let webChannel = client.guilds.cache.get(apiMessage.guildId).channels.cache.find(c => c.name === 'soundboard' && c.type === 'GUILD_TEXT');
-//     if (webChannel) {
-//         let webhooks = await webChannel.fetchWebhooks();
-//         if (webhooks) {
-//             webhooks.first().send({
-//                 content: `;${apiMessage.name}`,
-//                 username: apiMessage.username,
-//                 avatarURL: `https://cdn.discordapp.com/avatars/${apiMessage.userId}/${apiMessage.userAvatar}.jpg`
-//             })
-//         }
-//     }
-// });
