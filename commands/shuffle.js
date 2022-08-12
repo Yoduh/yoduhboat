@@ -1,7 +1,7 @@
-const command = async (message, guildPlayer) => {
+const command = async (message, guildPlayer, isWeb = false) => {
     if (guildPlayer.queue.length === 0) {
-        message.channel.send(`Empty queue can't be shuffled`);
-        return;
+        if (!isWeb) message.channel.send(`Empty queue can't be shuffled`);
+        return false;
     }
     let restoreFirst = null;
     let queue = [ ...guildPlayer.queue ];
@@ -18,8 +18,8 @@ const command = async (message, guildPlayer) => {
     }
     guildPlayer.queue.length = 0;
     guildPlayer.queue.push(...queue);
-    message.channel.send(`Queue has been shuffled`)
-    return;
+    if (!isWeb) message.channel.send(`Queue has been shuffled`)
+    return true;
 }
 
 module.exports = command;

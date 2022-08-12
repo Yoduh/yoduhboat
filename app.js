@@ -24,6 +24,12 @@ var corsOptions = {
 }
 app.use(cors(corsOptions));
 
+app.post('/api/wss', async (req, res) => {
+    const arr = [...wss.clients].map(c => { return { id: c } });
+    console.log(arr)
+    return res.status(200).send({wss: arr});
+})
+
 app.post('/api/getToken', async (req, res) => {
     const params = new URLSearchParams();
       params.append('client_id', process.env.DISCORD_CLIENT_ID);
@@ -100,28 +106,34 @@ app.post('/api/servers', (req, res) => {
     return res.send(matchingGuilds);
 })
 
-const playerForceStart = (guildPlayer) => {
+const playerForceStart = (guildId, guildPlayer) => {
+    updateWebClients('remove', guildId, guildPlayer)
     guildPlayer.forceStart();
 }
 let debounceStart = debounce(playerForceStart, 500);
-app.post('/api/remove', async (req, res) => {
-    const guildPlayer = masterPlayer.getPlayer(req.body.guild);
+app.post('/api/remove', async (req, res) => { 
+    const guildId = req.body.guild;
+    const guildPlayer = masterPlayer.getPlayer(guildId);
     try {
-        let removeResponse = await commands.remove(req.body.songId, null, guildPlayer, true);
-        return res.status(200).send(removeResponse);
+        await commands.remove(req.body.songId, null, guildPlayer, true);
+        return res.sendStatus(200);
     } catch(e) {
+        console.log('remove err', e)
         return res.sendStatus(500)
     } finally {
         // debounce to allow enough time for player to stop and handle possibly more 'remove first song' requests
         if (guildPlayer.songRemoving) {
-            debounceStart(guildPlayer);
+            debounceStart(guildId, guildPlayer);
+        } else {
+            updateWebClients('remove', guildId, guildPlayer)
         }
     }
 });
 
 app.post('/api/pause', async (req, res) => {
     console.log('pause endpoint hit')
-    const guildPlayer = masterPlayer.getPlayer(req.body.guild);
+    const guildId = req.body.guild;
+    const guildPlayer = masterPlayer.getPlayer(guildId);
     try {
         // if current song removed while paused, player will not have a resource and need to issue playTrack() instead of pause()
         if (guildPlayer.player.state.resource) {
@@ -132,22 +144,61 @@ app.post('/api/pause', async (req, res) => {
             const item = guildPlayer.queue[0];
             masterPlayer.playTrack(item, guildPlayer);
         }
-        // doesn't work
-        // if (oldState === 'paused') {
-        //   guildPlayer.player.pause();
-        // }
-        return res.status(200).send(guildPlayer.player.state.status);
+        updateWebClients('pause', guildId, guildPlayer)
+        return res.sendStatus(200);
     } catch(e) {
+        console.log('pause err', e)
         return res.sendStatus(500)
     }
 })
 
 app.post('/api/seek', async (req, res) => {
-    const guildPlayer = masterPlayer.getPlayer(req.body.guild);
+    console.log('seek endpoint')
+    const guildId = req.body.guild;
+    const guildPlayer = masterPlayer.getPlayer(guildId);
+    guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
     try {
         await commands.seek(req.body.seekTime, guildPlayer);
+        res.sendStatus(200);
+        console.log('done seeking, status?', guildPlayer.player.state.status)
+        if (guildPlayer.player.state.status !== 'paused') {
+            console.log('update em')
+            updateWebClients('sync', guildId, guildPlayer)
+        }
+        return;
+    } catch(e) {
+        console.log('seek err', e)
+        return res.sendStatus(500);
+    }
+})
+
+app.post('/api/addSong', async (req, res) => {
+    const guildId = req.body.guild;
+    const userId = req.body.user;
+    const url = req.body.url;
+    const message = await generateFakeMessage(userId, guildId)
+    const guildPlayer = masterPlayer.getPlayer(guildId);
+    try {
+        await commands.play([url], true, message, guildPlayer, false);
+        updateWebClients('play', guildId, guildPlayer)
         return res.sendStatus(200);
     } catch(e) {
+        console.log('addSong err', e)
+        return res.sendStatus(500);
+    }
+})
+
+app.post('/api/shuffle', async (req, res) => {
+    console.log('shuffle endpoint')
+    const guildId = req.body.guild;
+    const guildPlayer = masterPlayer.getPlayer(guildId);
+    try {
+        let result = await commands.shuffle(null, guildPlayer, true);
+        console.log('result', result);
+        updateWebClients('shuffle', guildId, guildPlayer)
+        return res.sendStatus(200);
+    } catch(e) {
+        console.log('shuffle err', e)
         return res.sendStatus(500);
     }
 })
@@ -160,25 +211,6 @@ app.post('/api/search', async (req, res) => {
         ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }) => 
         ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }))(r))
     res.status(200).send(formattedResults);
-})
-
-app.post('/api/addSong', async (req, res) => {
-    const guildId = req.body.guild;
-    const userId = req.body.user;
-    const url = req.body.url;
-    const message = await generateFakeMessage(userId, guildId)
-    console.log('message', message);
-    console.log('url', url);
-    const guildPlayer = masterPlayer.getPlayer(req.body.guild);
-    try {
-        await commands.play([url], true, message, guildPlayer, false);
-        const newSong = guildPlayer.queue[guildPlayer.queue.length - 1].song;
-        console.log('song added', newSong);
-        return res.status(200).send(JSON.stringify({ song: newSong }));
-    } catch(e) {
-        console.log('e', e)
-        return res.sendStatus(500);
-    }
 })
 
 app.listen(PORT, () => {

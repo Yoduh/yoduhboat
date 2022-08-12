@@ -66,16 +66,20 @@ const getSongDetails = async (songLink, message) => {
             await play.refreshToken();
         }
         const songInfo = await play.spotify(songLink);
+        // get info for closest matching youtube result
+        let results = await play.search(`${songInfo.artists[0].name} ${songInfo.name}`, {
+            limit: 1
+        })
         song = new Song({
             title: songInfo.name,
             artist: songInfo.artists[0].name,
-            link: songInfo.url,
+            link: results[0].url,
             source: "spotify",
-            duration: songInfo.durationInSec,
-            durationTime: secondsToTimestamp(songInfo.durationInSec),
+            duration: results[0].durationInSec,
+            durationTime: results[0].durationRaw,
             addedBy: message.member.user.username,
             // for web
-            thumbnail: songInfo.thumbnail.url,
+            thumbnail: results[0]?.thumbnails[0].url,
             avatar: `https://cdn.discordapp.com/avatars/${message.member.user.id}/${message.member.user.avatar}.png`
         });
     }

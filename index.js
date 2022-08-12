@@ -147,7 +147,7 @@ client.on("messageCreate", async (message) => {
                 result = await commands.play(args, false, message, guildPlayer, true);
                 break;
             case "remove":
-                await commands.remove(args, message, guildPlayer);
+                result = await commands.remove(args, message, guildPlayer);
                 break;
             case "stop":
                 result = await commands.stop(message, guildPlayer);
@@ -162,7 +162,7 @@ client.on("messageCreate", async (message) => {
                 await commands.skip(message, guildPlayer);
                 break;
             case "shuffle":
-                await commands.shuffle(message, guildPlayer);
+                result = await commands.shuffle(message, guildPlayer);
                 break;
             case "current":
                 await commands.current(message, guildPlayer);

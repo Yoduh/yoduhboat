@@ -89,6 +89,7 @@ module.exports = class Player {
             player: createAudioPlayer(),
             queue: [],
             currentStream: null,
+            pausedResource: null,
             connection: null,
             timeout: null,
             isPlaying: false,
@@ -105,7 +106,9 @@ module.exports = class Player {
             }
         }
         guildPlayer.broadcastSync = () => {
+            console.log('1')
             if (!guildPlayer.broadcaster) {
+                console.log('2')
                 guildPlayer.broadcaster = setInterval(() => {
                     if (guildPlayer.socketListeners.size > 0 && !guildPlayer.songRemoving) {
                         console.log('Player is sending sync update', guildPlayer.currentStream.playbackDuration)
@@ -115,7 +118,8 @@ module.exports = class Player {
             }
         }
         guildPlayer.player.on(AudioPlayerStatus.Playing, async () => {
-            guildPlayer.broadcastSync()
+            console.log('in playing status, broadcast?', guildPlayer.broadcaster)
+            guildPlayer.broadcastSync();
         }),
         guildPlayer.player.on(AudioPlayerStatus.Paused, async () => {
             console.log('pause state')
@@ -129,6 +133,10 @@ module.exports = class Player {
                 return;
             }
             console.log("player is idle, shifting queue");
+            // cancel scheduled sync from previous song
+            if (guildPlayer.broadcaster) {
+                guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
+            }
             const doneItem = guildPlayer.queue.shift();
             if (doneItem) {
                 broadcastDoneSong(guildPlayer.guildId, doneItem.song);
@@ -145,7 +153,7 @@ module.exports = class Player {
                 }
             } else {
                 console.log("queue is empty.  isPlaying = false");
-                clearInterval(guildPlayer.broadcaster);
+                guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
                 guildPlayer.isPlaying = false;
             }
         });
@@ -174,22 +182,9 @@ module.exports = class Player {
     }
 
     async playTrack(args, guildPlayer) {
-        console.log('playTrack()')
         guildPlayer.isPlaying = true;
         let song = args.song;
         let isWeb = args.isWeb;
-
-        // SPOTIFY
-        if (song.source === "spotify") {
-            const searched = await play.search(`${song.artist} ${song.title}`, {
-                limit: 1
-            });
-            if (!searched || searched.length === 0) {
-                console.log("no youtube video of that song was found")
-                return;
-            }
-            song.link = searched[0].url;
-        }
 
         let stream = await play.stream(song.link)
         let resource = createAudioResource(stream.stream, {

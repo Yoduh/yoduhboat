@@ -6,7 +6,7 @@ global.wss = new WebSocket.Server({ port: 7071 });
 function wssStart() {
   wss.on('connection', (ws, req) => {
       const parameters = url.parse(req.url, true);
-      ws.id =  parameters.query.userId;
+      ws.id = parameters.query.userId;
 
       ws.on('message', async messageBuf => {
           const message = clientResponse(messageBuf.toString());
@@ -16,12 +16,12 @@ function wssStart() {
               const guildPlayer = masterPlayer.getPlayer(message.guild)
               guildPlayer.socketListeners.add(ws.id);
               ws.guildPlayer = guildPlayer;
-              console.log('ws opened', ws.id)
+              console.log('ws opened from web', ws.id)
               const response = { 
                 isPlaying: guildPlayer.isPlaying, 
                 isPaused: guildPlayer.player.state.status === 'paused' ? true : false, 
-                playTime: guildPlayer?.currentStream?.playbackDuration,
-                queue: guildPlayer.queue.map(q => q.song),
+                queue: guildPlayer.queue.map(q => q.song), // sending 'queue' first sets playTime = 0 on frontend
+                initialTime: guildPlayer?.currentStream?.playbackDuration, // so always send playTime after queue if sending together
                 botVoiceChannel: guildPlayer.voiceChannel ? guildPlayer.voiceChannel : null,
                 userVoiceId: voiceChannel
               }
@@ -33,8 +33,8 @@ function wssStart() {
             const response = { 
               isPlaying: guildPlayer.isPlaying, 
               isPaused: guildPlayer.player.state.status === 'paused' ? true : false, 
-              playTime: guildPlayer?.currentStream?.playbackDuration,
-              queue: guildPlayer.queue.map(q => q.song)
+              queue: guildPlayer.queue.map(q => q.song),
+              playTime: guildPlayer?.currentStream?.playbackDuration
             }
             console.log('rejoin response: ', response);
             ws.send(JSON.stringify(response));
@@ -48,7 +48,6 @@ function wssStart() {
       })
 
       ws.on('close', () => {
-          console.log('ws closed', ws.id)
           ws.guildPlayer?.socketListeners.delete(ws.id);
           wss.clients.delete(ws);
       })
@@ -56,6 +55,7 @@ function wssStart() {
 }
 
 function updateWebClients(command, guildId, guildPlayer) {
+  console.log('update command', command);
   const guildWS = [...wss.clients].filter(ws => {
       return ws.guild == guildId;
   });
@@ -63,13 +63,18 @@ function updateWebClients(command, guildId, guildPlayer) {
       switch(command) {
           case "play":
           case "playnext":
+          case "shuffle":
             ws.send(JSON.stringify({ isPlaying: true, queue: guildPlayer.queue.map(q => q.song) }));
+            break;
+          case "remove":
+            ws.send(JSON.stringify({ isPlaying: guildPlayer.isPlaying, queue: guildPlayer.queue.map(q => q.song) }));
             break;
           case "stop":
             ws.send(JSON.stringify({ stopped: true }));
             break;
           case "pause":
-            if (guildPlayer.player.state.status === 'playing') {
+            console.log('pause status: ', guildPlayer.player.state.status)
+            if (guildPlayer.player.state.status !== 'paused') {
               ws.send(JSON.stringify({ isPaused: false, playTime: guildPlayer?.currentStream?.playbackDuration }));
             } else {
               ws.send(JSON.stringify({ isPaused: true, playTime: guildPlayer?.currentStream?.playbackDuration }));
@@ -84,6 +89,8 @@ function updateWebClients(command, guildId, guildPlayer) {
               botVoiceChannel: guildPlayer.voiceChannel ? guildPlayer.voiceChannel : null
             }));
             break;
+          case "default":
+            console.log('unhandled update for command:', command)
       }
   });
 }

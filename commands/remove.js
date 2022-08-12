@@ -35,7 +35,7 @@ const command = async (args, message, guildPlayer, isWeb) => {
     }
     if (firstRemove === '' || firstRemove === 0 || firstRemove > lastRemove || firstRemove > guildPlayer.queue.length || lastRemove > guildPlayer.queue.length) {
         message.reply(`Invalid removal choice. Use command \`.queue\` to find proper song numbers`)
-        return;
+        return false;
     }
     let removeCount = lastRemove - firstRemove + 1;
     let removedItems = guildPlayer.queue.slice(firstRemove - 1, lastRemove);
@@ -45,7 +45,7 @@ const command = async (args, message, guildPlayer, isWeb) => {
     }
     guildPlayer.queue.splice(firstRemove - 1, removeCount);
     message.channel.send(`Removed ${removed(removedItems)} from queue`);
-    return;
+    return true;
 }
 
 const removed = (removedItems) =>

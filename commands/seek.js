@@ -10,6 +10,10 @@ const command = async (seekTime, guildPlayer) => {
   resource.volume.setVolume(0.2);
   resource.playbackDuration = seekTime
   guildPlayer.currentStream = resource;
+  if (guildPlayer.player.state.status === 'paused') {
+    guildPlayer.pausedResource = resource;
+    return false;
+  }
   guildPlayer.player.play(resource);
   return true;
 }
