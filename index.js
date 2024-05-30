@@ -35,7 +35,7 @@ if (process.env.NODE_ENV !== 'production') {
     }));
 }
 const fs = require('fs');
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 console.log
 const commands = require('./commands');
 // const { editEmbed } = require("./commands/list");
@@ -52,7 +52,7 @@ const client = new Client({
     fetchAllMembers: true
 });
 
-const prefix = ".";
+const prefix = "@";
 const yoduhId = '200809303907631104';
 global.masterPlayer = null;
 
@@ -70,8 +70,8 @@ client.on("ready", async () => {
     console.log("bot is online");
     API(client, masterPlayer);
     wssStart();
-    client.user.setActivity("music | .commands", {
-        type: "PLAYING"
+    client.user.setActivity("music | @commands", {
+        type: ActivityType.Playing
     });
 });
 

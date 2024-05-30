@@ -22,18 +22,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 
 var corsOptions = {
-    origin: ['http://localhost:5173', 'https://yoduhboat.netlify.app', 'https://localhost:443'],
+    origin: ['http://localhost:5173', 'https://boat.yoduh.dev', 'https://localhost:443'],
     optionsSuccessStatus: 200
 }
 app.use(cors(corsOptions));
 
-app.post('/api/wss', async (req, res) => {
+app.post('/yoduhboat/api/wss', async (req, res) => {
     const arr = [...wss.clients].map(c => { return { id: c } });
     console.log(arr)
     return res.status(200).send({wss: arr});
 })
 
-app.post('/api/getToken', async (req, res) => {
+app.post('/yoduhboat/api/getToken', async (req, res) => {
     const params = new URLSearchParams();
       params.append('client_id', process.env.DISCORD_CLIENT_ID);
       params.append('client_secret', process.env.DISCORD_CLIENT_SECRET);
@@ -53,9 +53,9 @@ app.post('/api/getToken', async (req, res) => {
         })
 });
 
-app.post('/api/setToken', async (req, res) => {
+app.post('/yoduhboat/api/setToken', async (req, res) => {
     try {
-        const tokenResponse = await axios.get('https://discordapp.com/api/users/@me', {
+        const tokenResponse = await axios.get('https://discord.com/api/users/@me', {
             headers: {
             Authorization: `Bearer ${req.body.access_token}`
             }
@@ -74,7 +74,7 @@ app.post('/api/setToken', async (req, res) => {
             )
         }
         user = user.toObject()
-        const guildResponse = await axios.get('https://discordapp.com/api/users/@me/guilds', {
+        const guildResponse = await axios.get('https://discord.com/api/users/@me/guilds', {
             headers: {
             Authorization: `Bearer ${req.body.access_token}`
             }
@@ -95,7 +95,7 @@ app.post('/api/setToken', async (req, res) => {
         }
         return res.status(tokenResponse.status).send(user);
     } catch (e) {
-        console.log("error in /api/setToken", e);
+        console.log("error in /yoduhboat/api/setToken", e);
         return res.sendStatus(401);
     }
 });
@@ -122,7 +122,7 @@ async function validateUser(req) {
     return !!user;
 }
 
-app.post('/api/servers', (req, res) => {
+app.post('/yoduhboat/api/servers', (req, res) => {
     let botGuilds = client.guilds.cache.map(g => g.id);
     let userGuilds = req.body.guilds;
     let matchingGuilds = userGuilds.filter(g => botGuilds.includes(g));
@@ -134,7 +134,7 @@ const playerForceStart = (guildId, guildPlayer) => {
     guildPlayer.forceStart();
 }
 let debounceStart = debounce(playerForceStart, 500);
-app.post('/api/remove', async (req, res) => { 
+app.post('/yoduhboat/api/remove', async (req, res) => { 
     const guildId = req.body.guild;
     const guildPlayer = masterPlayer.getPlayer(guildId);
     try {
@@ -154,7 +154,7 @@ app.post('/api/remove', async (req, res) => {
     }
 });
 
-app.post('/api/pause', async (req, res) => {
+app.post('/yoduhboat/api/pause', async (req, res) => {
     console.log('pause endpoint hit')
     const guildId = req.body.guild;
     const guildPlayer = masterPlayer.getPlayer(guildId);
@@ -176,7 +176,7 @@ app.post('/api/pause', async (req, res) => {
     }
 })
 
-app.post('/api/seek', async (req, res) => {
+app.post('/yoduhboat/api/seek', async (req, res) => {
     console.log('seek endpoint')
     const guildId = req.body.guild;
     const guildPlayer = masterPlayer.getPlayer(guildId);
@@ -196,7 +196,7 @@ app.post('/api/seek', async (req, res) => {
     }
 })
 
-app.post('/api/addSong', async (req, res) => {
+app.post('/yoduhboat/api/addSong', async (req, res) => {
     const guildId = req.body.guild;
     const userId = req.body.user;
     const songOrPlaylist = req.body.url;
@@ -212,7 +212,7 @@ app.post('/api/addSong', async (req, res) => {
     }
 })
 
-app.post('/api/addSongNext', async (req, res) => {
+app.post('/yoduhboat/api/addSongNext', async (req, res) => {
     const guildId = req.body.guild;
     const userId = req.body.user;
     const songOrPlaylist = req.body.url;
@@ -228,7 +228,7 @@ app.post('/api/addSongNext', async (req, res) => {
     }
 })
 
-app.post('/api/shuffle', async (req, res) => {
+app.post('/yoduhboat/api/shuffle', async (req, res) => {
     console.log('shuffle endpoint')
     const guildId = req.body.guild;
     const guildPlayer = masterPlayer.getPlayer(guildId);
@@ -243,7 +243,7 @@ app.post('/api/shuffle', async (req, res) => {
     }
 })
 
-app.post('/api/search', async (req, res) => {
+app.post('/yoduhboat/api/search', async (req, res) => {
     const { text } = req.body
     if (text.includes("list=")) {
         const result = await play.playlist_info(text, { incomplete : true });
@@ -267,7 +267,7 @@ app.post('/api/search', async (req, res) => {
     }
 })
 
-app.get('/api/playlists', async (req, res) => {
+app.get('/yoduhboat/api/playlists', async (req, res) => {
     try {
         const { guildId } = req.query
         let dbGuild = await Guild.findOne({guildId: guildId}).populate('playlists', ['createdBy', 'duration', 'name', 'songs', 'id']).exec();
@@ -288,7 +288,7 @@ app.get('/api/playlists', async (req, res) => {
     }
 })
 
-app.get('/api/playlist', async (req, res) => {
+app.get('/yoduhboat/api/playlist', async (req, res) => {
     const { playlistId } = req.query
     let playlist = await Playlist.findById(playlistId).populate('songs').populate('createdBy', 'username');
     if (!playlist) {
@@ -297,7 +297,7 @@ app.get('/api/playlist', async (req, res) => {
     res.status(200).send(playlist);
 })
 
-app.post('/api/playlist/removesong', async (req, res) => { 
+app.post('/yoduhboat/api/playlist/removesong', async (req, res) => { 
     const { guildId, userId, playlistName, index } = req.body
     const message = await generateFakeMessage(userId, guildId)
     try {
@@ -311,7 +311,7 @@ app.post('/api/playlist/removesong', async (req, res) => {
     }
 });
 
-app.post('/api/playlist/remove', async (req, res) => { 
+app.post('/yoduhboat/api/playlist/remove', async (req, res) => { 
     const { guildId, userId, playlistName } = req.body
     const message = await generateFakeMessage(userId, guildId)
     try {
@@ -325,7 +325,7 @@ app.post('/api/playlist/remove', async (req, res) => {
     }
 });
 
-app.post('/api/playlist/create', async (req, res) => { 
+app.post('/yoduhboat/api/playlist/create', async (req, res) => { 
     const { guildId, userId, playlistName } = req.body
     const message = await generateFakeMessage(userId, guildId)
     try {
@@ -339,7 +339,7 @@ app.post('/api/playlist/create', async (req, res) => {
     }
 });
 
-app.post('/api/playlist/addsong', async (req, res) => { 
+app.post('/yoduhboat/api/playlist/addsong', async (req, res) => { 
     const { guildId, userId, playlistName, songUrl } = req.body
     const message = await generateFakeMessage(userId, guildId)
     try {
@@ -353,7 +353,7 @@ app.post('/api/playlist/addsong', async (req, res) => {
     }
 });
 
-app.post('/api/stop', async (req, res) => { 
+app.post('/yoduhboat/api/stop', async (req, res) => { 
     const { guildId } = req.body
     const guildPlayer = masterPlayer.getPlayer(guildId);
     try {

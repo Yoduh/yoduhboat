@@ -1,7 +1,13 @@
 const WebSocket = require('ws');
 const url = require('url');
+const fs = require('fs');
 
-global.wss = new WebSocket.Server({ port: 7071 });
+global.wss = new WebSocket.Server({ 
+  port: 7071,
+  // enable in prod
+  // cert: fs.readFileSync('/etc/letsencrypt/live/yoduh.dev/fullchain.pem'),
+  // key: fs.readFileSync('/etc/letsencrypt/live/yoduh.dev/privkey.pem')
+});
 
 function wssStart() {
   wss.on('connection', (ws, req) => {
@@ -55,7 +61,6 @@ function wssStart() {
 }
 
 function updateWebClients(command, guildId, guildPlayer) {
-  console.log('update command', command);
   const guildWS = [...wss.clients].filter(ws => {
       return ws.guild == guildId;
   });
