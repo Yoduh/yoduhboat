@@ -1,8 +1,10 @@
-const command = async (message, guildPlayer) => {
+const command = async (message, guildPlayer, isWeb = false) => {
     guildPlayer.queue.length = 0;
     guildPlayer.player.stop();
     guildPlayer.isPlaying = false;
-    message.channel.send("player stopped");
+    if (!isWeb) {
+        message.channel.send("player stopped");
+    }
     return true;
 }
 

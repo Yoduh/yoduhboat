@@ -89,6 +89,10 @@ function updateWebClients(command, guildId, guildPlayer) {
               botVoiceChannel: guildPlayer.voiceChannel ? guildPlayer.voiceChannel : null
             }));
             break;
+          case "playlist":
+            console.log('send it')
+            ws.send("playlist updated");
+            break;
           case "default":
             console.log('unhandled update for command:', command)
       }

@@ -1,16 +1,17 @@
 const Song = require("../../db/Song");
 
-const command = async (args, message, dbGuild) => {
-    if (args.length < 2) {
+// args = [ playlist name, indeces to remove("X" or "X-Y") ]
+const command = async (args, message, dbGuild, isWeb) => {
+    if (args.length < 2 && !isWeb) {
         message.reply("Incorrect command usage. Lookup command format with \`.commands\`!")
-        return;
+        return false;
     }
     let remove = args.pop();
     let playlistName = args.join(" ");
     let playlist = dbGuild.playlists.find(p => p.namelower === playlistName.toLowerCase());
-    if (!playlist) {
+    if (!playlist && !isWeb) {
         message.reply("Can't find a playlist with that name.")
-        return;
+        return false;
     }
     let firstRemove = Number(remove.split("-")[0]);
     let lastRemove = null;
@@ -19,9 +20,9 @@ const command = async (args, message, dbGuild) => {
     } else {
         lastRemove = firstRemove;
     }
-    if (firstRemove === '' || firstRemove === 0 || firstRemove > lastRemove || firstRemove > playlist.songs.length || lastRemove > playlist.songs.length) {
+    if (!isWeb && (firstRemove === '' || firstRemove === 0 || firstRemove > lastRemove || firstRemove > playlist.songs.length || lastRemove > playlist.songs.length)) {
         message.reply(`Invalid removal choice. Use command \`.playlist display ${playlistName}\` to find proper song numbers`)
-        return;
+        return false;
     }
     let removeCount = lastRemove - firstRemove + 1;
     let removedSongs = playlist.songs.splice(firstRemove - 1, removeCount);
@@ -35,8 +36,10 @@ const command = async (args, message, dbGuild) => {
         previousValue + currentValue.duration, 0);
     playlist.duration -= removedDuration;
     playlist.save();
-    message.channel.send(`Removed \`${removeCount}\` songs from playlist`);
-    return;
+    if (!isWeb) {
+        message.channel.send(`Removed \`${removeCount}\` songs from playlist`);
+    }
+    return true;
 }
 
 module.exports = command;

@@ -5,10 +5,13 @@ const emitter = require('./helpers/emitter');
 const mongoose = require("mongoose");
 const play = require('play-dl');
 const User = require("./db/User");
+const Guild = require("./db/Guild");
+const Playlist = require("./db/Playlist");
 mongoose.connect("mongodb://localhost/music");
 const commands = require('./commands');
 const debounce = require('debounce')
 const { updateWebClients } = require ("./Websocket");
+const util = require('./helpers/util');
 let client = null;
 
 const API = function(_client, masterPlayer) {
@@ -19,7 +22,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 
 var corsOptions = {
-    origin: ['http://127.0.0.1:5173', 'https://yoduhboat.netlify.app', 'https://localhost:443'],
+    origin: ['http://localhost:5173', 'https://yoduhboat.netlify.app', 'https://localhost:443'],
     optionsSuccessStatus: 200
 }
 app.use(cors(corsOptions));
@@ -70,6 +73,26 @@ app.post('/api/setToken', async (req, res) => {
                 {upsert: true, new: true}, // options (upsert: create on not found, new: return updated user after transaction)
             )
         }
+        user = user.toObject()
+        const guildResponse = await axios.get('https://discordapp.com/api/users/@me/guilds', {
+            headers: {
+            Authorization: `Bearer ${req.body.access_token}`
+            }
+        });
+        if (guildResponse.status === 200) {
+            let formattedGuilds = guildResponse.data.map(g => {
+                let link = null;
+                if (g.icon) {
+                  link = `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.jpg`;
+                }
+                return {
+                  ...g,
+                  image: link
+                };
+              });
+            user.avatar = tokenResponse.data.avatar
+            user.guilds = formattedGuilds
+        }
         return res.status(tokenResponse.status).send(user);
     } catch (e) {
         console.log("error in /api/setToken", e);
@@ -119,9 +142,10 @@ app.post('/api/remove', async (req, res) => {
         return res.sendStatus(200);
     } catch(e) {
         console.log('remove err', e)
-        return res.sendStatus(500)
+        return res.status(500).send(e.toString());
     } finally {
         // debounce to allow enough time for player to stop and handle possibly more 'remove first song' requests
+        console.log('queue length', guildPlayer.queue.length)
         if (guildPlayer.songRemoving) {
             debounceStart(guildId, guildPlayer);
         } else {
@@ -148,7 +172,7 @@ app.post('/api/pause', async (req, res) => {
         return res.sendStatus(200);
     } catch(e) {
         console.log('pause err', e)
-        return res.sendStatus(500)
+        return res.status(500).send(e.toString());
     }
 })
 
@@ -168,23 +192,39 @@ app.post('/api/seek', async (req, res) => {
         return;
     } catch(e) {
         console.log('seek err', e)
-        return res.sendStatus(500);
+        return res.status(500).send(e.toString());
     }
 })
 
 app.post('/api/addSong', async (req, res) => {
     const guildId = req.body.guild;
     const userId = req.body.user;
-    const url = req.body.url;
+    const songOrPlaylist = req.body.url;
     const message = await generateFakeMessage(userId, guildId)
     const guildPlayer = masterPlayer.getPlayer(guildId);
     try {
-        await commands.play([url], true, message, guildPlayer, false);
+        await commands.play([songOrPlaylist], true, message, guildPlayer, false);
         updateWebClients('play', guildId, guildPlayer)
         return res.sendStatus(200);
     } catch(e) {
         console.log('addSong err', e)
-        return res.sendStatus(500);
+        return res.status(500).send(e.toString());
+    }
+})
+
+app.post('/api/addSongNext', async (req, res) => {
+    const guildId = req.body.guild;
+    const userId = req.body.user;
+    const songOrPlaylist = req.body.url;
+    const message = await generateFakeMessage(userId, guildId)
+    const guildPlayer = masterPlayer.getPlayer(guildId);
+    try {
+        await commands.play([songOrPlaylist], true, message, guildPlayer, true);
+        updateWebClients('play', guildId, guildPlayer)
+        return res.sendStatus(200);
+    } catch(e) {
+        console.log('addSongNext err', e)
+        return res.status(500).send(e.toString());
     }
 })
 
@@ -199,19 +239,133 @@ app.post('/api/shuffle', async (req, res) => {
         return res.sendStatus(200);
     } catch(e) {
         console.log('shuffle err', e)
-        return res.sendStatus(500);
+        return res.status(500).send(e.toString());
     }
 })
 
 app.post('/api/search', async (req, res) => {
-    const results = await play.search(`${req.body.text}`, {
-        limit: 10
-    });
-    const formattedResults = results.map(r => (
-        ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }) => 
-        ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }))(r))
-    res.status(200).send(formattedResults);
+    const { text } = req.body
+    if (text.includes("list=")) {
+        const result = await play.playlist_info(text, { incomplete : true });
+        console.log('result', result)
+        let durationInSec = 0
+        result.videos.forEach(v => {
+            durationInSec += v.durationInSec;
+        })
+        const durationRaw = util.secondsToTimestamp(durationInSec)
+        const songs = result.videos.map(r => (
+            ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }) => 
+            ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }))(r))
+        const formattedResult = { durationInSec, durationRaw, id: result.id, thumbnail: result.thumbnail, count: result.videoCount, title: result.title, channel: result.channel, url: result.link, songs}
+        res.status(200).send(formattedResult);
+    } else {
+        const results = await play.search(`${text}`, { limit: 10 });
+        const formattedResults = results.map(r => (
+            ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }) => 
+            ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }))(r))
+        res.status(200).send(formattedResults);
+    }
 })
+
+app.get('/api/playlists', async (req, res) => {
+    try {
+        const { guildId } = req.query
+        let dbGuild = await Guild.findOne({guildId: guildId}).populate('playlists', ['createdBy', 'duration', 'name', 'songs', 'id']).exec();
+        let playlists = dbGuild.playlists;
+        total = playlists.length;
+        let formattedResults = [];
+        for(let i = 0; i < playlists.length; i++) {
+            let playlist = playlists[i];
+            let user = await User.findById(playlist.createdBy);
+            let duration = util.secondsToTimestamp(playlist.duration);
+
+            formattedResults.push({ id: playlist.id, name: playlist.name, songsNum: playlist.songs.length, duration: duration, createdBy: user.username})
+        }
+        res.status(200).send(formattedResults);
+    } catch(e) {
+        console.log('playlists err', e)
+        return res.status(500).send(e.toString());
+    }
+})
+
+app.get('/api/playlist', async (req, res) => {
+    const { playlistId } = req.query
+    let playlist = await Playlist.findById(playlistId).populate('songs').populate('createdBy', 'username');
+    if (!playlist) {
+        return res.status(404).send('Playlist not found')
+    }
+    res.status(200).send(playlist);
+})
+
+app.post('/api/playlist/removesong', async (req, res) => { 
+    const { guildId, userId, playlistName, index } = req.body
+    const message = await generateFakeMessage(userId, guildId)
+    try {
+        await commands.playlist(['remove', playlistName, index], message, null,  true);
+        return res.sendStatus(200);
+    } catch(e) {
+        console.log('playlist remove err', e)
+        return res.status(500).send(e.toString());
+    } finally {
+        updateWebClients('playlist', guildId)
+    }
+});
+
+app.post('/api/playlist/remove', async (req, res) => { 
+    const { guildId, userId, playlistName } = req.body
+    const message = await generateFakeMessage(userId, guildId)
+    try {
+        await commands.playlist(['delete', playlistName], message, null,  true);
+        return res.sendStatus(200);
+    } catch(e) {
+        console.log('playlist delete err', e)
+        return res.status(500).send(e.toString());
+    } finally {
+        updateWebClients('playlist', guildId)
+    }
+});
+
+app.post('/api/playlist/create', async (req, res) => { 
+    const { guildId, userId, playlistName } = req.body
+    const message = await generateFakeMessage(userId, guildId)
+    try {
+        await commands.playlist(['create', playlistName], message, null, true);
+        return res.sendStatus(200);
+    } catch(e) {
+        console.log('playlist create err', e)
+        return res.status(500).send(e.toString());
+    } finally {
+        updateWebClients('playlist', guildId)
+    }
+});
+
+app.post('/api/playlist/addsong', async (req, res) => { 
+    const { guildId, userId, playlistName, songUrl } = req.body
+    const message = await generateFakeMessage(userId, guildId)
+    try {
+        await commands.playlist(['add', playlistName, songUrl], message, null,  true);
+        return res.sendStatus(200);
+    } catch(e) {
+        console.log('playlist add err', e)
+        return res.status(500).send(e.toString());
+    } finally {
+        updateWebClients('playlist', guildId)
+    }
+});
+
+app.post('/api/stop', async (req, res) => { 
+    const { guildId } = req.body
+    const guildPlayer = masterPlayer.getPlayer(guildId);
+    try {
+        await commands.stop(null, guildPlayer,  true);
+        return res.sendStatus(200);
+    } catch(e) {
+        console.log('stop err', e)
+        return res.status(500).send(e.toString());
+    } finally {
+        updateWebClients('stop', guildId)
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Now listening to requests on port ${PORT}`);
@@ -225,7 +379,8 @@ async function generateFakeMessage(userId, guildId) {
         member: {
             user: {
                 id: member.user.id,
-                avatar: member.user.avatar
+                avatar: member.user.avatar,
+                username: member.user.username
             },
             voice: {
                 channel: {

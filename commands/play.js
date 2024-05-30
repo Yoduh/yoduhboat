@@ -28,7 +28,7 @@ const command = async (args, isWeb, message, guildPlayer, isNext) => {
     // No link given
     if (description) {
         // first check for named playlist
-        const dbGuild = await Guild.findOne({guildId: message.guildId}).populate('playlists').exec();
+        const dbGuild = await Guild.findOne({guildId: message.guild.id}).populate('playlists').exec();
         const userPlaylist = dbGuild.playlists.find(p => p.namelower === description.toLowerCase());
         if (userPlaylist) {
             let queueItems = await Promise.all(userPlaylist.songs.map(async s => { 
@@ -44,7 +44,9 @@ const command = async (args, isWeb, message, guildPlayer, isNext) => {
                 return i;
             })
             guildPlayer.queue.push(...queueItems);
-            message.channel.send(`Added \`${userPlaylist.songs.length}\` songs from playlist \`${userPlaylist.name}\` to queue \`[${util.secondsToTimestamp(userPlaylist.duration)}]\``)
+            if (!isWeb) {
+                message.channel.send(`Added \`${userPlaylist.songs.length}\` songs from playlist \`${userPlaylist.name}\` to queue \`[${util.secondsToTimestamp(userPlaylist.duration)}]\``)
+            }
             return true;
         }
 
@@ -114,7 +116,9 @@ const pushSongToQueue = async (songLink, message, isWeb, guildPlayer, isNext) =>
         } else {
             guildPlayer.queue.push(...queueItems);
         }
-        message.channel.send(`Found and added \`${queueItems.length}\` songs from ${songData.type} **${songData.artists?.length > 0 ? songData.artists[0].name + ' - ' : ''}${songData.title ? songData.title : songData.name}**`)
+        if (!isWeb) {
+            message.channel.send(`Found and added \`${queueItems.length}\` songs from ${songData.type} **${songData.artists?.length > 0 ? songData.artists[0].name + ' - ' : ''}${songData.title ? songData.title : songData.name}**`)
+        }
         return true;
     }
 

@@ -102,6 +102,7 @@ const pushSongToPlaylist = async (songLink, message, userPlaylist) => {
     }
     if (songlist.length > 0) {
         const songlistDetails = await Promise.all(songlist.map(async s => { 
+            console.log('s.url', s.url)
             let song = await getSongDetails(s.url, message);
             userPlaylist.duration += song.duration;
             return await song.save();

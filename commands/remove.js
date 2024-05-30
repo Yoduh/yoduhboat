@@ -21,6 +21,9 @@ const command = async (args, message, guildPlayer, isWeb) => {
             guildPlayer.player.stop(force);  // force destroy playing resource if paused
         }
         guildPlayer.queue.splice(index, 1);
+        if (guildPlayer.queue.length === 0) {
+            guildPlayer.songRemoving = false;
+        }
         return true;
     }
 

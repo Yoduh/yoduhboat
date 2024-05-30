@@ -1,5 +1,5 @@
 const play = require('play-dl');
-const { MessageEmbed } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const util = require('../helpers/util');
 
 const command = async (message, guildPlayer) => {
@@ -19,7 +19,7 @@ const youtubeEmbed = async (song, playTime) => {
     if (description.length > 256) {
         description = description.slice(0, 256) + "...";
     } 
-    return new MessageEmbed()
+    return new EmbedBuilder()
     .setColor('#0099ff')
     .setAuthor({ name: songInfo.video_details.channel.name, 
         iconURL: songInfo.video_details.channel.icons.length > 2 ? songInfo.video_details.channel.icons[2].url : '',

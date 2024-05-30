@@ -35,8 +35,8 @@ module.exports = class Player {
     // if user joins/leaves a channel and there is a ws.id matching user.id, need to ws.send(voiceChannel: null)
     voiceStateUpdate = async (oldState, newState) => {
         const guildPlayer = this.getPlayer(oldState.guild.id);
-        if (!guildPlayer || newState.guild.afkChannelId === newState.channelId) return;
-        if (newState.member.user.id === newState.guild.me.id) {
+        if (!guildPlayer || newState.guild.afkChannelId === newState.channelId || newState.member.user.bot) return;
+        if (newState.member.user.id === newState.guild.members.me.user.id) {
             guildPlayer.voiceChannel = newState.channel ? { id: newState.channel.id, name: newState.channel.name } : null;
             // inform listening websockets of new bot voice channel
             updateWebClients('join', newState.guild.id, guildPlayer);
@@ -49,12 +49,12 @@ module.exports = class Player {
             ws.send(JSON.stringify({ userVoiceId: newState.channelId }))
         }
 
-        if (guildPlayer.timeout && newState?.channelId && newState.channelId === newState.guild?.me?.voice?.channelId) {
+        if (guildPlayer.timeout && newState?.channelId && newState.channelId === newState.guild?.members?.me?.voice?.channelId) {
             clearTimeout(guildPlayer.timeout) //If user is joining bot's channel, remove idle timer if it exists
             console.log("user joined. timeout cleared!");
             return;
         }
-        if (oldState.channelId !== oldState.guild.me.voice.channelId || !oldState.channel){
+        if (oldState.channelId !== oldState.guild.members.me.voice.channelId || !oldState.channel){
             return; //If user left channel that wasn't bot's channel... don't care
         }
         if(oldState.channel.members.filter(m => !m.user.bot).size === 0 && guildPlayer.connection){
@@ -106,19 +106,17 @@ module.exports = class Player {
             }
         }
         guildPlayer.broadcastSync = () => {
-            console.log('1')
             if (!guildPlayer.broadcaster) {
-                console.log('2')
                 guildPlayer.broadcaster = setInterval(() => {
                     if (guildPlayer.socketListeners.size > 0 && !guildPlayer.songRemoving) {
-                        console.log('Player is sending sync update', guildPlayer.currentStream.playbackDuration)
+                        // console.log('Player is sending sync update', guildPlayer.currentStream.playbackDuration)
                         updateWebClients('sync', guildPlayer.guildId, guildPlayer)
                     }
                 }, 3000);
             }
         }
         guildPlayer.player.on(AudioPlayerStatus.Playing, async () => {
-            console.log('in playing status, broadcast?', guildPlayer.broadcaster)
+            // console.log('in playing status, broadcast?', guildPlayer.broadcaster)
             guildPlayer.broadcastSync();
         }),
         guildPlayer.player.on(AudioPlayerStatus.Paused, async () => {

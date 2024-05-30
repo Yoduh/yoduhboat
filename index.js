@@ -35,18 +35,19 @@ if (process.env.NODE_ENV !== 'production') {
     }));
 }
 const fs = require('fs');
-const { Client, Intents } = require('discord.js');
+const { Client, GatewayIntentBits } = require('discord.js');
 console.log
 const commands = require('./commands');
 // const { editEmbed } = require("./commands/list");
 
 const client = new Client({
     intents: [
-        Intents.FLAGS.GUILDS,
-        Intents.FLAGS.GUILD_MESSAGES,
-        Intents.FLAGS.GUILD_VOICE_STATES,
-        Intents.FLAGS.GUILD_MEMBERS,
-        Intents.FLAGS.GUILD_MESSAGE_REACTIONS
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessageReactions
     ],
     fetchAllMembers: true
 });
@@ -135,6 +136,7 @@ client.on("messageCreate", async (message) => {
         username: message.member.user.username
     }, { upsert: true, new: true });
     let result = false;
+    message.member = {user: { id: user.id } }
     try {
         switch(command) {
             case "join":
@@ -180,7 +182,7 @@ client.on("messageCreate", async (message) => {
                 await commands.channel(args, message);
                 break;
             case "playlist":
-                await commands.playlist(args, message, user);
+                result = await commands.playlist(args, message, user, false);
                 break;
             case "seek":
                 await commands.seek(guildPlayer);
