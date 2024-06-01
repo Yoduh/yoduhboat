@@ -21,7 +21,7 @@ const command = async (args, message) => {
         let playlist = playlists[num];
         let user = await User.findById(playlist.createdBy);
         let duration = util.secondsToTimestamp(playlist.duration);
-        response += `\n**${playlist.name}** - \`${playlist.songs.length}\` songs \`[${duration}]\` created by **${user.username}**`
+        response += `\n**${playlist.name}** - \`${playlist.songs.length}\` songs \`[${duration}]\` created by **${user.global_name}**`
     }
     message.channel.send(response);
     return;

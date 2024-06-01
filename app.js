@@ -7,6 +7,7 @@ const play = require('play-dl');
 const User = require("./db/User");
 const Guild = require("./db/Guild");
 const Playlist = require("./db/Playlist");
+const Song = require("./db/Song");
 mongoose.connect("mongodb://localhost/music");
 const commands = require('./commands');
 const debounce = require('debounce')
@@ -33,24 +34,93 @@ app.post('/yoduhboat/api/wss', async (req, res) => {
     return res.status(200).send({wss: arr});
 })
 
+app.get('/yoduhboat/api/devshit', async (req, res) => {
+    //const goodPlaylists = ['628ee1ef09035a18c4ac3e89', '629d108cce141e84be8d0a84', '62afc8ee95d133deef0dd552', '62bf9e060ee9450d61133a46', '62bfc54e0ee9450d61133b90', '62d823720ee9450d6113510e', '62e422a21a2a91e1aa926667', '6338d6fffbd22d834bfdeeee', '634daa14d29597c90b10f18b', '634dafc0d29597c90b10f255', '6352d5cad29597c90b10f75e', '6352d97fd29597c90b10f844', '6352e653d29597c90b10f9df', '6352e69fd29597c90b10fa60', '6352ee9ffe5de38f9d929fe7', '63608013af2816c2fec8b403', '636605ebaf2816c2fec8b9e9', '636c3925af2816c2fec8c401', '64c83a51df33abcc1bc2f412', '64d5a88e5ef3a43aeb0043a1', '64d5bead5ef3a43aeb0043d6', '64d6b17b5ef3a43aeb004565', '64d7a4895ef3a43aeb0045d1', '64d7cab05ef3a43aeb0046a2', '64d800c45ef3a43aeb0046ea', '64e0170c5ef3a43aeb004bc1', '64e379c75ef3a43aeb004d0e', '64f79e51980c63c08868f4b2', '64f7a25f980c63c08868f568', '64f8b333980c63c08868f693', '653ebdbb4d679f35f7ebd5d7', '654efa2b29f3cee7daf6328b', '65619a8229f3cee7daf63cb5', '65764ea029f3cee7daf644de', '65822b5429f3cee7daf64acf', '65a08b88520d2233b7de93ef', '65dbf1e6793132887e57dff9']
+    // const dbUsers = await User.find({});
+    const song = await Song.findOne({title: 'Throne'});
+    console.log('song', song)
+    song.link = 'https://open.spotify.com/track/3zvjgw8Lt41RIyYbrlegJk'
+    song.save()
+    // let allPlaylistSongs = []
+    // for (const dbPlaylist of allPlaylists) {
+    //     allPlaylistSongs.push(...(dbPlaylist.songs).map(s => s._id.valueOf()))
+    // }
+    // console.log('number of songs on all playlists: ', allPlaylistSongs.length)
+    // console.log('number of all songs in db: ', allSongs.length)
+    // let count = 0;
+    // for (const dbSong of allSongs) {
+    //     if (!allPlaylistSongs.includes(dbSong._id.valueOf())) {
+    //         // dbSong.deleteOne();
+    //         count++
+    //     }
+    // }
+    // console.log('count', count)
+
+
+    // for (const dbSong of allSongs) {
+    //     console.log('-----------------------')
+    //     console.log('song: ', dbSong.title)
+        // update addedBy name and avatar
+        // if (!dbSong.avatar) {
+            // try {
+            //     let user = await dbUsers.find(dbuser => dbuser.username === dbSong.addedBy || dbuser.global_name === dbSong.addedBy)
+            //     if (user) {
+            //         dbSong.addedBy = user.global_name
+            //         dbSong.avatar = `https://cdn.discordapp.com/avatars/${user.userId}/${user.avatar}.png` //user.avatar
+            //         console.log('user info updated')
+            //     }
+            // } catch(e) {
+            //     console.log('error updating user info for ', dbSong.title)
+            //     console.log(e)
+            // }
+        // }
+
+        // update thumbnail
+        // if (!dbSong.thumbnail) {
+        //     try {
+        //         if (dbSong.source === 'youtube') {
+        //             const ytInfo = await play.video_info(dbSong.link)
+        //             dbSong.thumbnail = ytInfo.video_details?.thumbnails[0].url
+        //             console.log('youtube thumbnail updated')
+        //         } else if(dbSong.source === 'spotify') {
+        //             if (play.is_expired()) {
+        //                 await play.refreshToken();
+        //             }
+        //             const spotifyInfo = await play.spotify(dbSong.link);
+        //             let results = await play.search(`${spotifyInfo.artists[0].name} ${spotifyInfo.name}`, {
+        //                 limit: 1
+        //             })
+        //             dbSong.thumbnail = results[0]?.thumbnails[0].url
+        //             console.log('spotify thumbnail updated')
+        //         }
+        //     } catch(e) {
+        //         console.log('error with song', dbSong.title)
+        //         console.log(e)
+        //     }
+        // }
+        // await dbSong.save()
+    // }
+    return res.status(200)
+})
+
 app.post('/yoduhboat/api/getToken', async (req, res) => {
     const params = new URLSearchParams();
-      params.append('client_id', process.env.DISCORD_CLIENT_ID);
-      params.append('client_secret', process.env.DISCORD_CLIENT_SECRET);
-      params.append('grant_type', 'authorization_code');
-      params.append('code', req.query.code);
-      params.append('redirect_uri', `${req.headers.referer}auth/redirect`);
-      // fetch the access token
-      axios
-        .post('https://discord.com/api/v8/oauth2/token', params, {
-          headers: {
-            'content-type': 'application/x-www-form-urlencoded'
-          }
-        }).then(result => {
-            return res.send(result.data);
-        }).catch(e => {
-            console.log('getToken error', e)
-        })
+    params.append('client_id', process.env.DISCORD_CLIENT_ID);
+    params.append('client_secret', process.env.DISCORD_CLIENT_SECRET);
+    params.append('grant_type', 'authorization_code');
+    params.append('code', req.query.code);
+    params.append('redirect_uri', `${req.headers.referer}auth/redirect`);
+    // fetch the access token
+    axios
+    .post('https://discord.com/api/v8/oauth2/token', params, {
+        headers: {
+        'content-type': 'application/x-www-form-urlencoded'
+        }
+    }).then(result => {
+        return res.send(result.data);
+    }).catch(e => {
+        console.log('getToken error', e)
+    })
 });
 
 app.post('/yoduhboat/api/setToken', async (req, res) => {
@@ -68,6 +138,8 @@ app.post('/yoduhboat/api/setToken', async (req, res) => {
                     ...req.body,
                     userId: tokenResponse.data.id,
                     username: tokenResponse.data.username,
+                    global_name: tokenResponse.data.global_name,
+                    avatar: tokenResponse.data.avatar,
                     updatedAt: Date.now()
                 },
                 {upsert: true, new: true}, // options (upsert: create on not found, new: return updated user after transaction)
@@ -245,25 +317,74 @@ app.post('/yoduhboat/api/shuffle', async (req, res) => {
 
 app.post('/yoduhboat/api/search', async (req, res) => {
     const { text } = req.body
+    let results = []
+    // youtube playlist
     if (text.includes("list=")) {
-        const result = await play.playlist_info(text, { incomplete : true });
-        console.log('result', result)
+        results = await play.playlist_info(text, { incomplete : true });
+        console.log('results', results)
+        results.type = 'playlist'
+    }
+    // spotify
+    else if (text.includes("spotify.com")) {
+        if (play.is_expired()) {
+            await play.refreshToken()
+        }
+        let spotifyData = await play.spotify(text);
+        // spotify album or playlist (return 1 search result per song)
+        if(spotifyData.tracksCount) {
+            console.log('spotifyData', spotifyData)
+            const spotifyTracks = spotifyData.fetched_tracks.values().next().value;
+            results = await Promise.all(spotifyTracks.map(async track => {
+                // get info for closest matching youtube result
+                return play.search(`${track.artists[0].name} ${track.name}`, {
+                    limit: 1
+                })
+            }));
+            results = { 
+                type: 'playlist',
+                id: spotifyData.id,
+                title: spotifyData.name,
+                channel: { name: 'Spotify' },
+                videos: results.map(r => r[0]),
+                videoCount: results.length,
+                url: spotifyData.url,
+                thumbnail: spotifyData.thumbnail
+            }
+        } 
+        // single spotify song (return 10 search results)
+        else {
+            results = await play.search(`${spotifyData.artists[0].name} ${spotifyData.name}`, {
+                limit: 10
+            })
+        }
+    }
+    // single youtube song search
+    else {
+        results = await play.search(`${text}`, { limit: 10 });
+    }
+    // format playlist results
+    if (results.type === 'playlist') {
         let durationInSec = 0
-        result.videos.forEach(v => {
+        results.videos.forEach(v => {
             durationInSec += v.durationInSec;
         })
         const durationRaw = util.secondsToTimestamp(durationInSec)
-        const songs = result.videos.map(r => (
+        let thumbnail = results.thumbnail?.url ?? results.videos[0].thumbnails[0].url
+        if (thumbnail.includes('?')) {
+            thumbnail = thumbnail.split('?')[0]
+        }
+        const songs = results.videos.map(r => (
             ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }) => 
             ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }))(r))
-        const formattedResult = { durationInSec, durationRaw, id: result.id, thumbnail: result.thumbnail, count: result.videoCount, title: result.title, channel: result.channel, url: result.link, songs}
-        res.status(200).send(formattedResult);
-    } else {
-        const results = await play.search(`${text}`, { limit: 10 });
+        const formattedResults = { durationInSec, durationRaw, thumbnail: thumbnail, id: results.id, count: results.videoCount, title: results.title, channel: results.channel, url: results.url, songs}
+        return res.status(200).send(formattedResults);
+    }
+    // format single song results
+    else {
         const formattedResults = results.map(r => (
             ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }) => 
             ({ durationInSec, durationRaw, id, thumbnails, title, url, channel }))(r))
-        res.status(200).send(formattedResults);
+        return res.status(200).send(formattedResults);
     }
 })
 
@@ -279,7 +400,7 @@ app.get('/yoduhboat/api/playlists', async (req, res) => {
             let user = await User.findById(playlist.createdBy);
             let duration = util.secondsToTimestamp(playlist.duration);
 
-            formattedResults.push({ id: playlist.id, name: playlist.name, songsNum: playlist.songs.length, duration: duration, createdBy: user.username})
+            formattedResults.push({ id: playlist.id, name: playlist.name, songsNum: playlist.songs.length, duration: duration, createdBy: user.global_name})
         }
         res.status(200).send(formattedResults);
     } catch(e) {
@@ -290,7 +411,7 @@ app.get('/yoduhboat/api/playlists', async (req, res) => {
 
 app.get('/yoduhboat/api/playlist', async (req, res) => {
     const { playlistId } = req.query
-    let playlist = await Playlist.findById(playlistId).populate('songs').populate('createdBy', 'username');
+    let playlist = await Playlist.findById(playlistId).populate('songs').populate('createdBy', 'global_name');
     if (!playlist) {
         return res.status(404).send('Playlist not found')
     }
@@ -367,6 +488,8 @@ app.post('/yoduhboat/api/stop', async (req, res) => {
     }
 });
 
+
+
 app.listen(PORT, () => {
     console.log(`Now listening to requests on port ${PORT}`);
 });
@@ -380,7 +503,7 @@ async function generateFakeMessage(userId, guildId) {
             user: {
                 id: member.user.id,
                 avatar: member.user.avatar,
-                username: member.user.username
+                global_name: member.user.globalName
             },
             voice: {
                 channel: {
@@ -393,6 +516,7 @@ async function generateFakeMessage(userId, guildId) {
             voiceAdapterCreator: guild.voiceAdapterCreator
         }
     }
+    console.log('message', message)
     return message;
 }
 

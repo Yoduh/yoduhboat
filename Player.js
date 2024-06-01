@@ -141,13 +141,24 @@ module.exports = class Player {
             }
             //play until queue is empty
             if (guildPlayer.queue.length > 0) {
-                const item = guildPlayer.queue[0];
-                console.log("now playing:", item.song.title)
-                try {
-                    this.playTrack(item, guildPlayer);
-                } catch(e) {
-                    console.log(e);
-                    guildPlayer.queue.shift();
+                let success = false
+                let queueItem = null
+                while (!success) {
+                    queueItem = guildPlayer.queue[0];
+                    try {
+                        success = await this.playTrack(queueItem, guildPlayer);
+                    } catch(e) {
+                        console.log(e);
+                        if (!queueItem.isWeb) {
+                            queueItem.message.reply(`Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`)
+                        }
+                        updateWebClients('error', guildPlayer.guildId, guildPlayer, { error: `Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`})
+                        guildPlayer.queue.shift();
+                        broadcastDoneSong(guildPlayer.guildId, queueItem.song)
+                        if (guildPlayer.queue.length === 0) {
+                            success = true
+                        }
+                    }
                 }
             } else {
                 console.log("queue is empty.  isPlaying = false");
@@ -156,19 +167,31 @@ module.exports = class Player {
             }
         });
 
-        eventify(guildPlayer.queue, () => {
+        eventify(guildPlayer.queue, async () => {
             if (guildPlayer.player.state.status === 'paused') {
                 console.log("eventify: player is paused, unpausing");
                 guildPlayer.player.unpause();
             }
             if (!guildPlayer.isPlaying) {
                 console.log("eventify: player is not playing, playing first track in queue")
-                let item = guildPlayer.queue[0];
-                try {
-                    this.playTrack(item, guildPlayer);
-                } catch(e) {
-                    console.log(e);
-                    guildPlayer.queue.shift();
+                let success = false
+                let queueItem = null
+                while (!success) {
+                    queueItem = guildPlayer.queue[0];
+                    try {
+                        success = await this.playTrack(queueItem, guildPlayer);
+                    } catch(e) {
+                        console.log(e);
+                        if (!queueItem.isWeb) {
+                            queueItem.message.reply(`Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`)
+                        }
+                        updateWebClients('error', guildPlayer.guildId, guildPlayer, { error: `Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`})
+                        guildPlayer.queue.shift();
+                        broadcastDoneSong(guildPlayer.guildId, queueItem.song)
+                        if (guildPlayer.queue.length === 0) {
+                            success = true
+                        }
+                    }
                 }
             } else {
                 console.log("eventify: guild player is already playing, not forcing play")
@@ -180,21 +203,44 @@ module.exports = class Player {
     }
 
     async playTrack(args, guildPlayer) {
-        guildPlayer.isPlaying = true;
-        let song = args.song;
-        let isWeb = args.isWeb;
+        return new Promise(async (resolve, reject) => {
+            const song = args.song;
+            // const isWeb = args.isWeb;
+            // const message = args.message
 
-        let stream = await play.stream(song.link)
-        let resource = createAudioResource(stream.stream, {
-            inlineVolume: true,
-            inputType: stream.type
+            // legacy database song needs to be updated to youtube link
+            if (song.link.includes('spotify.com')) {
+                if (play.is_expired()) {
+                    await play.refreshToken();
+                }
+                const songInfo = await play.spotify(song.link);
+                // get info for closest matching youtube result
+                let results = await play.search(`${songInfo.artists[0].name} ${songInfo.name}`, {
+                    limit: 1
+                })
+                song.link = results[0].url
+                song.duration = results[0].durationInSec
+                song.durationTime = results[0].durationRaw
+                await song.save()
+            }
+
+            guildPlayer.isPlaying = true;
+            let stream = null
+            try {
+                stream = await play.stream(song.link)
+            } catch (e) {
+                return reject(e)
+            }
+            if (stream) {
+                let resource = createAudioResource(stream.stream, {
+                    inlineVolume: true,
+                    inputType: stream.type
+                })
+                resource.volume.setVolume(0.2);
+                guildPlayer.currentStream = resource;
+                guildPlayer.player.play(resource);
+            }
+            resolve(true);
         })
-        resource.volume.setVolume(0.2);
-        guildPlayer.currentStream = resource;
-        guildPlayer.player.play(resource);
-        // const guild = await Guild.findOne({guildId: message.guild.id});
-        // guild.history.push(song);
-        // guild.save();
-        return;
     }
 }

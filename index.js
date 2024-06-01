@@ -131,12 +131,16 @@ client.on("messageCreate", async (message) => {
     
     const guildPlayer = masterPlayer.getPlayer(message.guild.id);
     guildPlayer.responseChannel = message.channel;
+    console.log('message2', message.member.user)
     const user = await User.findOneAndUpdate({userId: message.member.user.id}, {
         userId: message.member.user.id,
-        username: message.member.user.username
+        username: message.member.user.username,
+        global_name: message.member.user.globalName,
+        avatar: message.member.user.avatar,
     }, { upsert: true, new: true });
     let result = false;
     message.member = {user: { id: user.id } }
+    message.member.user.global_name = message.member.user.globalName
     try {
         switch(command) {
             case "join":

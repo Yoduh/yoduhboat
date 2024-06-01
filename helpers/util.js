@@ -47,15 +47,20 @@ const getSongDetails = async (songLink, message) => {
     // YOUTUBE
     if (songLink.includes("youtu")) {
         const songInfo = await play.video_info(songLink)
+        let songThumbnail = songInfo.video_details?.thumbnails[0].url
+        // cut off non-sensical query string which stupidly sets some size that we dont want
+        if (songThumbnail && songThumbnail.includes('?')) {
+            songThumbnail = songThumbnail.split('?')[0]
+        }
         song = new Song({
             title: songInfo.video_details.title,
             link: songInfo.video_details.url,
             source: "youtube",
             duration: songInfo.video_details.durationInSec,
             durationTime: songInfo.video_details.durationRaw,
-            addedBy: message.member.user.username,
+            addedBy: message.member.user.global_name,
             // for web
-            thumbnail: songInfo.video_details?.thumbnails[0].url,
+            thumbnail: songThumbnail,
             avatar: `https://cdn.discordapp.com/avatars/${message.member.user.id}/${message.member.user.avatar}.png`,
         });
         return song;
@@ -77,7 +82,7 @@ const getSongDetails = async (songLink, message) => {
             source: "spotify",
             duration: results[0].durationInSec,
             durationTime: results[0].durationRaw,
-            addedBy: message.member.user.username,
+            addedBy: message.member.user.global_name,
             // for web
             thumbnail: results[0]?.thumbnails[0].url,
             avatar: `https://cdn.discordapp.com/avatars/${message.member.user.id}/${message.member.user.avatar}.png`
@@ -93,7 +98,7 @@ const pushSongToPlaylist = async (songLink, message, userPlaylist) => {
     if (songLink.includes("list=")) {
         playlist = await play.playlist_info(songLink, { incomplete : true });
         songlist = playlist.videos;
-    } else if(songLink.includes("/playlist/")) {
+    } else if(songLink.includes("/playlist/") || songLink.includes("/album/")) {
         if (play.is_expired()) {
             await play.refreshToken()
         }
@@ -102,7 +107,6 @@ const pushSongToPlaylist = async (songLink, message, userPlaylist) => {
     }
     if (songlist.length > 0) {
         const songlistDetails = await Promise.all(songlist.map(async s => { 
-            console.log('s.url', s.url)
             let song = await getSongDetails(s.url, message);
             userPlaylist.duration += song.duration;
             return await song.save();

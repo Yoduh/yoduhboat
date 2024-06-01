@@ -39,7 +39,7 @@ const command = async (args, isWeb, message, guildPlayer, isNext) => {
                 };
             }));
             queueItems = queueItems.map(i => {
-                i.song.addedBy = message.member.user.username;
+                i.song.addedBy = message.member.user.global_name;
                 i.song.avatar = `https://cdn.discordapp.com/avatars/${message.member.user.id}/${message.member.user.avatar}.png`; // for web
                 return i;
             })

@@ -49,7 +49,7 @@ async function createCommandsEmbed(pageNum, message) {
         let user = await User.findById(playlist.createdBy);
         let duration = util.secondsToTimestamp(playlist.duration);
 
-        fieldArray[i] = { name: `**${playlist.name}**`, value: `\`${playlist.songs.length}\` songs \`[${duration}]\` created by **${user.username}**` }
+        fieldArray[i] = { name: `**${playlist.name}**`, value: `\`${playlist.songs.length}\` songs \`[${duration}]\` created by **${user.global_name}**` }
     }
     const commandEmbed = new EmbedBuilder()
     .setTitle(`Playlists ${total > 25 ? `(page ${pageNum})` : ''}`)

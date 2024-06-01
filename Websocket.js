@@ -31,7 +31,6 @@ function wssStart() {
                 botVoiceChannel: guildPlayer.voiceChannel ? guildPlayer.voiceChannel : null,
                 userVoiceId: voiceChannel
               }
-              console.log('response: ', response);
               ws.send(JSON.stringify(response));
           }
           else if (message === 'rejoin') {
@@ -60,46 +59,50 @@ function wssStart() {
   })
 }
 
-function updateWebClients(command, guildId, guildPlayer) {
+function updateWebClients(command, guildId, guildPlayer, args = null) {
   const guildWS = [...wss.clients].filter(ws => {
       return ws.guild == guildId;
   });
   guildWS.forEach(ws => {
       switch(command) {
-          case "play":
-          case "playnext":
-          case "shuffle":
-            ws.send(JSON.stringify({ isPlaying: true, queue: guildPlayer.queue.map(q => q.song) }));
-            break;
-          case "remove":
-            ws.send(JSON.stringify({ isPlaying: guildPlayer.isPlaying, queue: guildPlayer.queue.map(q => q.song) }));
-            break;
-          case "stop":
-            ws.send(JSON.stringify({ stopped: true }));
-            break;
-          case "pause":
-            console.log('pause status: ', guildPlayer.player.state.status)
-            if (guildPlayer.player.state.status !== 'paused') {
-              ws.send(JSON.stringify({ isPaused: false, playTime: guildPlayer?.currentStream?.playbackDuration }));
-            } else {
-              ws.send(JSON.stringify({ isPaused: true, playTime: guildPlayer?.currentStream?.playbackDuration }));
-            }
-          case "sync":
-            ws.send(JSON.stringify({
-              playTime: guildPlayer?.currentStream?.playbackDuration
-            }));
-            break;
-          case "join":
-            ws.send(JSON.stringify({
-              botVoiceChannel: guildPlayer.voiceChannel ? guildPlayer.voiceChannel : null
-            }));
-            break;
-          case "playlist":
-            console.log('send it')
-            ws.send("playlist updated");
-            break;
-          case "default":
-            console.log('unhandled update for command:', command)
+        case "error":
+          const { error } = args
+          ws.send(JSON.stringify({ error: error }));
+          break;
+        case "play":
+        case "playnext":
+        case "shuffle":
+          ws.send(JSON.stringify({ isPlaying: true, queue: guildPlayer.queue.map(q => q.song) }));
+          break;
+        case "remove":
+          ws.send(JSON.stringify({ isPlaying: guildPlayer.isPlaying, queue: guildPlayer.queue.map(q => q.song) }));
+          break;
+        case "stop":
+          ws.send(JSON.stringify({ stopped: true }));
+          break;
+        case "pause":
+          console.log('pause status: ', guildPlayer.player.state.status)
+          if (guildPlayer.player.state.status !== 'paused') {
+            ws.send(JSON.stringify({ isPaused: false, playTime: guildPlayer?.currentStream?.playbackDuration }));
+          } else {
+            ws.send(JSON.stringify({ isPaused: true, playTime: guildPlayer?.currentStream?.playbackDuration }));
+          }
+        case "sync":
+          ws.send(JSON.stringify({
+            playTime: guildPlayer?.currentStream?.playbackDuration
+          }));
+          break;
+        case "join":
+          ws.send(JSON.stringify({
+            botVoiceChannel: guildPlayer.voiceChannel ? guildPlayer.voiceChannel : null
+          }));
+          break;
+        case "playlist":
+          console.log('send it')
+          ws.send("playlist updated");
+          break;
+        case "default":
+          console.log('unhandled update for command:', command)
       }
   });
 }
