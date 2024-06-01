@@ -34,74 +34,13 @@ app.post('/yoduhboat/api/wss', async (req, res) => {
     return res.status(200).send({wss: arr});
 })
 
-app.get('/yoduhboat/api/devshit', async (req, res) => {
-    //const goodPlaylists = ['628ee1ef09035a18c4ac3e89', '629d108cce141e84be8d0a84', '62afc8ee95d133deef0dd552', '62bf9e060ee9450d61133a46', '62bfc54e0ee9450d61133b90', '62d823720ee9450d6113510e', '62e422a21a2a91e1aa926667', '6338d6fffbd22d834bfdeeee', '634daa14d29597c90b10f18b', '634dafc0d29597c90b10f255', '6352d5cad29597c90b10f75e', '6352d97fd29597c90b10f844', '6352e653d29597c90b10f9df', '6352e69fd29597c90b10fa60', '6352ee9ffe5de38f9d929fe7', '63608013af2816c2fec8b403', '636605ebaf2816c2fec8b9e9', '636c3925af2816c2fec8c401', '64c83a51df33abcc1bc2f412', '64d5a88e5ef3a43aeb0043a1', '64d5bead5ef3a43aeb0043d6', '64d6b17b5ef3a43aeb004565', '64d7a4895ef3a43aeb0045d1', '64d7cab05ef3a43aeb0046a2', '64d800c45ef3a43aeb0046ea', '64e0170c5ef3a43aeb004bc1', '64e379c75ef3a43aeb004d0e', '64f79e51980c63c08868f4b2', '64f7a25f980c63c08868f568', '64f8b333980c63c08868f693', '653ebdbb4d679f35f7ebd5d7', '654efa2b29f3cee7daf6328b', '65619a8229f3cee7daf63cb5', '65764ea029f3cee7daf644de', '65822b5429f3cee7daf64acf', '65a08b88520d2233b7de93ef', '65dbf1e6793132887e57dff9']
-    // const dbUsers = await User.find({});
-    const song = await Song.findOne({title: 'Throne'});
-    console.log('song', song)
-    song.link = 'https://open.spotify.com/track/3zvjgw8Lt41RIyYbrlegJk'
-    song.save()
-    // let allPlaylistSongs = []
-    // for (const dbPlaylist of allPlaylists) {
-    //     allPlaylistSongs.push(...(dbPlaylist.songs).map(s => s._id.valueOf()))
-    // }
-    // console.log('number of songs on all playlists: ', allPlaylistSongs.length)
-    // console.log('number of all songs in db: ', allSongs.length)
-    // let count = 0;
-    // for (const dbSong of allSongs) {
-    //     if (!allPlaylistSongs.includes(dbSong._id.valueOf())) {
-    //         // dbSong.deleteOne();
-    //         count++
-    //     }
-    // }
-    // console.log('count', count)
-
-
-    // for (const dbSong of allSongs) {
-    //     console.log('-----------------------')
-    //     console.log('song: ', dbSong.title)
-        // update addedBy name and avatar
-        // if (!dbSong.avatar) {
-            // try {
-            //     let user = await dbUsers.find(dbuser => dbuser.username === dbSong.addedBy || dbuser.global_name === dbSong.addedBy)
-            //     if (user) {
-            //         dbSong.addedBy = user.global_name
-            //         dbSong.avatar = `https://cdn.discordapp.com/avatars/${user.userId}/${user.avatar}.png` //user.avatar
-            //         console.log('user info updated')
-            //     }
-            // } catch(e) {
-            //     console.log('error updating user info for ', dbSong.title)
-            //     console.log(e)
-            // }
-        // }
-
-        // update thumbnail
-        // if (!dbSong.thumbnail) {
-        //     try {
-        //         if (dbSong.source === 'youtube') {
-        //             const ytInfo = await play.video_info(dbSong.link)
-        //             dbSong.thumbnail = ytInfo.video_details?.thumbnails[0].url
-        //             console.log('youtube thumbnail updated')
-        //         } else if(dbSong.source === 'spotify') {
-        //             if (play.is_expired()) {
-        //                 await play.refreshToken();
-        //             }
-        //             const spotifyInfo = await play.spotify(dbSong.link);
-        //             let results = await play.search(`${spotifyInfo.artists[0].name} ${spotifyInfo.name}`, {
-        //                 limit: 1
-        //             })
-        //             dbSong.thumbnail = results[0]?.thumbnails[0].url
-        //             console.log('spotify thumbnail updated')
-        //         }
-        //     } catch(e) {
-        //         console.log('error with song', dbSong.title)
-        //         console.log(e)
-        //     }
-        // }
-        // await dbSong.save()
-    // }
-    return res.status(200)
-})
+// app.get('/yoduhboat/api/dev', async (req, res) => {
+//     const song = await Song.findOne({title: 'Throne'});
+//     console.log('song', song)
+//     song.link = 'https://open.spotify.com/track/3zvjgw8Lt41RIyYbrlegJk'
+//     song.save()
+//     return res.status(200)
+// })
 
 app.post('/yoduhboat/api/getToken', async (req, res) => {
     const params = new URLSearchParams();

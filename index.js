@@ -52,7 +52,7 @@ const client = new Client({
     fetchAllMembers: true
 });
 
-const prefix = "@";
+const prefix = "\\";
 const yoduhId = '200809303907631104';
 global.masterPlayer = null;
 
@@ -70,7 +70,7 @@ client.on("ready", async () => {
     console.log("bot is online");
     API(client, masterPlayer);
     wssStart();
-    client.user.setActivity("music | @commands", {
+    client.user.setActivity("music | \\commands", {
         type: ActivityType.Playing
     });
 });
