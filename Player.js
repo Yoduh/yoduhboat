@@ -36,7 +36,7 @@ module.exports = class Player {
     // if user joins/leaves a channel and there is a ws.id matching user.id, need to ws.send(voiceChannel: null)
     voiceStateUpdate = async (oldState, newState) => {
         const guildPlayer = this.getPlayer(oldState.guild.id);
-        if (!guildPlayer || newState.guild.afkChannelId === newState.channelId || newState.member.user.bot) return;
+        if (!guildPlayer || newState.guild.afkChannelId === newState.channelId) return;
         if (newState.member.user.id === newState.guild.members.me.user.id) {
             guildPlayer.voiceChannel = newState.channel ? { id: newState.channel.id, name: newState.channel.name } : null;
             // inform listening websockets of new bot voice channel
