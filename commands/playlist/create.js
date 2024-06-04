@@ -30,7 +30,7 @@ const command = async (args, message, dbGuild, user, isWeb) => {
     dbGuild.playlists.push(newPlaylist);
     await dbGuild.save();
     let res = `New playlist \`${playlistName}\` created`;
-    if (songLink) {
+    if (songLink && !isWeb) {
         const songsAdded = await util.pushSongToPlaylist(songLink, message, newPlaylist);
         res += ` with \`${songsAdded.length}\` songs`
     }

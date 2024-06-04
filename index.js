@@ -70,9 +70,16 @@ client.on("ready", async () => {
     console.log("bot is online");
     API(client, masterPlayer);
     wssStart();
-    client.user.setActivity("music | \\commands", {
-        type: ActivityType.Playing
-    });
+    // client.user.setActivity("music | https://boat.yoduh.dev | \\commands", {
+    //     type: ActivityType.Playing
+    // });
+    client.user.setPresence({
+        activities: [{
+            type: ActivityType.Custom,
+            name: "custom", // name is exposed through the API but not shown in the client for ActivityType.Custom
+            state: "🌐 boat.yoduh.dev | \\commands"
+            }]
+    })
 });
 
 client.on("error", (e, message) => {
@@ -112,7 +119,7 @@ client.on("messageCreate", async (message) => {
 	const commandBody = message.content.slice(prefix.length);
 	const args = commandBody.split(/\s+/);
 	const command = args.shift().toLowerCase();
-    console.log("command = ", command);
+    // console.log("command = ", command);
 
     let dbGuild = await Guild.findOne({guildId: message.guildId}).exec();
     if (command !== "musicchannel" && dbGuild?.allowedChannels.length > 0 && !dbGuild.allowedChannels.includes(message.channel.id)) {
@@ -131,7 +138,6 @@ client.on("messageCreate", async (message) => {
     
     const guildPlayer = masterPlayer.getPlayer(message.guild.id);
     guildPlayer.responseChannel = message.channel;
-    console.log('message2', message.member.user)
     const user = await User.findOneAndUpdate({userId: message.member.user.id}, {
         userId: message.member.user.id,
         username: message.member.user.username,

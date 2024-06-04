@@ -10,7 +10,7 @@ const guildSchema = new mongoose.Schema({
     allowedChannels: [String],
     history: {
         type: [mongoose.Schema.Types.ObjectId],
-        ref: 'Song',
+        ref: 'History',
         default: []
     },
     playlists: {

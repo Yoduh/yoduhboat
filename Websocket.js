@@ -81,7 +81,6 @@ function updateWebClients(command, guildId, guildPlayer, args = null) {
           ws.send(JSON.stringify({ stopped: true }));
           break;
         case "pause":
-          console.log('pause status: ', guildPlayer.player.state.status)
           if (guildPlayer.player.state.status !== 'paused') {
             ws.send(JSON.stringify({ isPaused: false, playTime: guildPlayer?.currentStream?.playbackDuration }));
           } else {
@@ -98,7 +97,6 @@ function updateWebClients(command, guildId, guildPlayer, args = null) {
           }));
           break;
         case "playlist":
-          console.log('send it')
           ws.send("playlist updated");
           break;
         case "default":

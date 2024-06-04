@@ -1,3 +1,5 @@
+const util = require('../helpers/util');
+
 const command = async (message, guildPlayer, isWeb = false) => {
     if (guildPlayer.queue.length === 0) {
         if (!isWeb) message.channel.send(`Empty queue can't be shuffled`);
@@ -19,6 +21,12 @@ const command = async (message, guildPlayer, isWeb = false) => {
     guildPlayer.queue.length = 0;
     guildPlayer.queue.push(...queue);
     if (!isWeb) message.channel.send(`Queue has been shuffled`)
+    const historyDetails = {
+        action: `shuffled the queue`,
+        userId: message.member.user.id,
+        guildId: guildPlayer.guildId
+    }
+    util.createHistory(historyDetails)
     return true;
 }
 

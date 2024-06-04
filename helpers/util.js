@@ -1,6 +1,9 @@
-const fs = require('fs');
 const play = require('play-dl');
 const Song = require("../db/Song");
+const Guild = require("../db/Guild");
+const History = require("../db/History");
+const User = require("../db/User");
+const { default: mongoose } = require('mongoose');
 
 const getTimeDifference = (start, end) => {
     const startInSec = timestampToSeconds(start);
@@ -105,10 +108,13 @@ const pushSongToPlaylist = async (songLink, message, userPlaylist) => {
         playlist = await play.spotify(songLink);
         songlist = playlist.fetched_tracks.values().next().value;
     }
+    let lastOrder = userPlaylist.songs.length > 0 ? Math.max(...userPlaylist.songs.map(s => s.order)) : 0
     if (songlist.length > 0) {
-        const songlistDetails = await Promise.all(songlist.map(async s => { 
+        const songlistDetails = await Promise.all(songlist.map(async s => {
+            s.order = ++lastOrder 
             let song = await getSongDetails(s.url, message);
             userPlaylist.duration += song.duration;
+            song.order = s.order
             return await song.save();
         }));
         userPlaylist.songs.push(...songlistDetails);
@@ -122,11 +128,28 @@ const pushSongToPlaylist = async (songLink, message, userPlaylist) => {
         message.reply("Error fetching song, try again later");
         return;
     }
+    song.order = ++lastOrder
     await song.save();
     userPlaylist.songs.push(song);
     userPlaylist.duration += song.duration;
     await userPlaylist.save();
     return song;
+}
+
+const createHistory = async (details) => {
+    const { action, userId, song, guildId } = details
+    const user = await User.findOne({ userId: userId })  // userId is discord ID
+    const dbGuild = await Guild.findOne({ guildId: guildId }).populate('history', 'createdAt')
+    if ((!userId || (userId && user)) && dbGuild) {
+        const newHistory = await History.create({action, user, song, guildId})
+        dbGuild.history.push(newHistory)
+        if (dbGuild.history.length > 100) {
+            const latestHistory = dbGuild.history.reduce((a, b) => a.createdAt < b.createdAt ? a : b)
+            const oldHistory = await History.findOne({ _id: latestHistory._id })
+            await oldHistory.deleteOne()
+        }
+        dbGuild.save()
+    }
 }
 
 
@@ -135,3 +158,4 @@ exports.timestampToSeconds = timestampToSeconds;
 exports.secondsToTimestamp = secondsToTimestamp;
 exports.getSongDetails = getSongDetails;
 exports.pushSongToPlaylist = pushSongToPlaylist;
+exports.createHistory = createHistory;

@@ -10,6 +10,7 @@ const songSchema = new mongoose.Schema({
     addedBy: String,
     avatar: String, // addedBy avatar
     thumbnail: String,
+    order: Number,
     playCount: {
         type: Number,
         default: 0

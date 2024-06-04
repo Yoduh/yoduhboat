@@ -38,7 +38,7 @@ const command = async (args, isWeb, message, guildPlayer, isNext) => {
                     message: message
                 };
             }));
-            queueItems = queueItems.map(i => {
+            queueItems = queueItems.sort((a, b) => a.song.order - b.song.order).map(i => {
                 i.song.addedBy = message.member.user.global_name;
                 i.song.avatar = `https://cdn.discordapp.com/avatars/${message.member.user.id}/${message.member.user.avatar}.png`; // for web
                 return i;
@@ -47,6 +47,12 @@ const command = async (args, isWeb, message, guildPlayer, isNext) => {
             if (!isWeb) {
                 message.channel.send(`Added \`${userPlaylist.songs.length}\` songs from playlist \`${userPlaylist.name}\` to queue \`[${util.secondsToTimestamp(userPlaylist.duration)}]\``)
             }
+            const historyDetails = {
+                action: `added ${isNext ? 'next ' : ''}${userPlaylist.songs.length} songs from playlist "${userPlaylist.name}"`,
+                userId: message.member.user.id,
+                guildId: guildPlayer.guildId
+            }
+            util.createHistory(historyDetails)
             return true;
         }
 
@@ -92,6 +98,7 @@ const pushSongToQueue = async (songLink, message, isWeb, guildPlayer, isNext) =>
     // add multiple songs if link is a playlist/album
     let songlist = [];
     let songData = null;
+    let songSource = songLink.includes('spotify.com') ? 'Spotify' : 'YouTube'
     if (songLink.includes("list=")) {
         songData = await play.playlist_info(songLink, { incomplete : true });
         songData.type = "playlist";
@@ -119,6 +126,12 @@ const pushSongToQueue = async (songLink, message, isWeb, guildPlayer, isNext) =>
         if (!isWeb) {
             message.channel.send(`Found and added \`${queueItems.length}\` songs from ${songData.type} **${songData.artists?.length > 0 ? songData.artists[0].name + ' - ' : ''}${songData.title ? songData.title : songData.name}**`)
         }
+        const historyDetails = {
+            action: `added ${isNext ? 'next ' : ''}${queueItems.length} songs from ${songSource} ${songData.type} %TITLE%${songData.title ?? songData.name}%TITLE%%LINK%${songData.url}%LINK%`,
+            userId: message.member.user.id,
+            guildId: guildPlayer.guildId
+        }
+        util.createHistory(historyDetails)
         return true;
     }
 
@@ -140,7 +153,14 @@ const pushSongToQueue = async (songLink, message, isWeb, guildPlayer, isNext) =>
     } else {
         guildPlayer.queue.push(queueItem);
     }
-    if (!isWeb) message.channel.send(`Added **${queueItem.song.artist ? queueItem.song.artist + ' - ': ''}${queueItem.song.title}** to queue`)
+    const title = `${queueItem.song.artist ? queueItem.song.artist + ' - ': ''}${queueItem.song.title}`
+    if (!isWeb) message.channel.send(`Added **${title}** to queue`)
+    const historyDetails = {
+        action: `added from ${songSource} %TITLE%${title}%TITLE%%LINK%${song.link}%LINK% from queue`,
+        userId: message.member.user.id,
+        guildId: guildPlayer.guildId
+    }
+    util.createHistory(historyDetails)
     return true;
 }
 

@@ -1,4 +1,5 @@
 const util = require('../../helpers/util');
+const Playlist = require("../../db/Playlist");
 
 const command = async (args, message, dbGuild, isWeb) => {
     const songLink = args.pop();
@@ -10,13 +11,14 @@ const command = async (args, message, dbGuild, isWeb) => {
         }
         return false;
     }
+    let dbPlaylist = await Playlist.findById(playlist._id).populate('songs')
     if (!songLink.startsWith("https://") && (!songLink.includes("youtu") || !songLink.includes("spotify"))) {
         if (!isWeb) {
             message.reply("This command only works with youtube or spotify links.")
         }
         return false;
     }
-    const songsAdded = await util.pushSongToPlaylist(songLink, message, playlist);
+    const songsAdded = await util.pushSongToPlaylist(songLink, message, dbPlaylist);
     if (!isWeb) {
         message.channel.send(`Added \`${songsAdded.length ? songsAdded.length + '\` songs' : '1\` song'} to playlist \`${playlistName}\``);
     }

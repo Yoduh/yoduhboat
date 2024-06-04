@@ -1,6 +1,7 @@
 const play = require('play-dl');
 const { createAudioResource } = require('@discordjs/voice');
 const { broadcastDoneSong, updateWebClients } = require('./Websocket');
+const util = require('./helpers/util');
 
 // do NOT clear queue by setting it to an empty array because it'll get rid of this...
 const eventify = function(arr, callback) {
@@ -101,7 +102,7 @@ module.exports = class Player {
             console.log('forcing start');
             guildPlayer.songRemoving = false;
             if (guildPlayer.currentStream) {    // if resource stream exists, we didn't remove while in pause state, so play immediately
-                this.playTrack(guildPlayer.queue[0], guildPlayer)
+                this.attemptPlay(guildPlayer)
                 guildPlayer.broadcastSync();
             }
         }
@@ -141,25 +142,7 @@ module.exports = class Player {
             }
             //play until queue is empty
             if (guildPlayer.queue.length > 0) {
-                let success = false
-                let queueItem = null
-                while (!success) {
-                    queueItem = guildPlayer.queue[0];
-                    try {
-                        success = await this.playTrack(queueItem, guildPlayer);
-                    } catch(e) {
-                        console.log(e);
-                        if (!queueItem.isWeb) {
-                            queueItem.message.reply(`Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`)
-                        }
-                        updateWebClients('error', guildPlayer.guildId, guildPlayer, { error: `Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`})
-                        guildPlayer.queue.shift();
-                        broadcastDoneSong(guildPlayer.guildId, queueItem.song)
-                        if (guildPlayer.queue.length === 0) {
-                            success = true
-                        }
-                    }
-                }
+                this.attemptPlay(guildPlayer)
             } else {
                 console.log("queue is empty.  isPlaying = false");
                 guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
@@ -174,25 +157,7 @@ module.exports = class Player {
             }
             if (!guildPlayer.isPlaying) {
                 console.log("eventify: player is not playing, playing first track in queue")
-                let success = false
-                let queueItem = null
-                while (!success) {
-                    queueItem = guildPlayer.queue[0];
-                    try {
-                        success = await this.playTrack(queueItem, guildPlayer);
-                    } catch(e) {
-                        console.log(e);
-                        if (!queueItem.isWeb) {
-                            queueItem.message.reply(`Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`)
-                        }
-                        updateWebClients('error', guildPlayer.guildId, guildPlayer, { error: `Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`})
-                        guildPlayer.queue.shift();
-                        broadcastDoneSong(guildPlayer.guildId, queueItem.song)
-                        if (guildPlayer.queue.length === 0) {
-                            success = true
-                        }
-                    }
-                }
+                this.attemptPlay(guildPlayer)
             } else {
                 console.log("eventify: guild player is already playing, not forcing play")
             }
@@ -200,6 +165,28 @@ module.exports = class Player {
 
         this.guildPlayers.set(guild.id, guildPlayer);
         return guildPlayer;
+    }
+
+    async attemptPlay(guildPlayer) {
+        let success = false
+        let queueItem = null
+        while (!success) {
+            queueItem = guildPlayer.queue[0];
+            try {
+                success = await this.playTrack(queueItem, guildPlayer);
+            } catch(e) {
+                console.log(e);
+                if (!queueItem.isWeb) {
+                    queueItem.message.reply(`Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`)
+                }
+                updateWebClients('error', guildPlayer.guildId, guildPlayer, { error: `Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`})
+                guildPlayer.queue.shift();
+                broadcastDoneSong(guildPlayer.guildId, queueItem.song)
+                if (guildPlayer.queue.length === 0) {
+                    success = true
+                }
+            }
+        }
     }
 
     async playTrack(args, guildPlayer) {
@@ -240,6 +227,13 @@ module.exports = class Player {
                 guildPlayer.currentStream = resource;
                 guildPlayer.player.play(resource);
             }
+            const title = `${song.artist ? song.artist + ' - ': ''}${song.title}`
+            const historyDetails = {
+                action: `now playing %TITLE%${title}%TITLE%%LINK%${song.link}%LINK%`,
+                userId: null,
+                guildId: guildPlayer.guildId
+            }
+            util.createHistory(historyDetails)
             resolve(true);
         })
     }

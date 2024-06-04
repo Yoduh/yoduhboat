@@ -1,5 +1,4 @@
-const { Console } = require("winston/lib/winston/transports");
-const Song = require("../db/Song");
+const util = require('../helpers/util');
 
 /*
 args: number or number range, e.g. "9" or "1-9"
@@ -20,10 +19,17 @@ const command = async (args, message, guildPlayer, isWeb) => {
             }
             guildPlayer.player.stop(force);  // force destroy playing resource if paused
         }
-        guildPlayer.queue.splice(index, 1);
+        const removed = guildPlayer.queue.splice(index, 1);
         if (guildPlayer.queue.length === 0) {
             guildPlayer.songRemoving = false;
         }
+        const historyDetails = {
+            action: `removed %SONG% from queue`,
+            userId: message.member.user.id,
+            song: removed[0].song,
+            guildId: guildPlayer.guildId
+        }
+        util.createHistory(historyDetails)
         return true;
     }
 
@@ -48,6 +54,7 @@ const command = async (args, message, guildPlayer, isWeb) => {
     }
     guildPlayer.queue.splice(firstRemove - 1, removeCount);
     message.channel.send(`Removed ${removed(removedItems)} from queue`);
+    ///////////////////// also create history document here //////////////////////////
     return true;
 }
 

@@ -1,3 +1,4 @@
+const Playlist = require("../../db/Playlist");
 const Song = require("../../db/Song");
 
 // args = [ playlist name, indeces to remove("X" or "X-Y") ]
@@ -35,7 +36,14 @@ const command = async (args, message, dbGuild, isWeb) => {
     const removedDuration = songDetails.reduce((previousValue, currentValue) => 
         previousValue + currentValue.duration, 0);
     playlist.duration -= removedDuration;
-    playlist.save();
+    await playlist.save();
+    // reorder songs
+    let dbPlaylist = await Playlist.findById(playlist._id).populate('songs')
+    let count = 0
+    dbPlaylist.songs.sort((a, b) => a.order - b.order).forEach(s => {
+        s.order = ++count
+        s.save();
+    })
     if (!isWeb) {
         message.channel.send(`Removed \`${removeCount}\` songs from playlist`);
     }

@@ -8,6 +8,7 @@ const User = require("./db/User");
 const Guild = require("./db/Guild");
 const Playlist = require("./db/Playlist");
 const Song = require("./db/Song");
+const History = require("./db/History");
 mongoose.connect("mongodb://localhost/music");
 const commands = require('./commands');
 const debounce = require('debounce')
@@ -34,13 +35,12 @@ app.post('/yoduhboat/api/wss', async (req, res) => {
     return res.status(200).send({wss: arr});
 })
 
-// app.get('/yoduhboat/api/dev', async (req, res) => {
-//     const song = await Song.findOne({title: 'Throne'});
-//     console.log('song', song)
-//     song.link = 'https://open.spotify.com/track/3zvjgw8Lt41RIyYbrlegJk'
-//     song.save()
-//     return res.status(200)
-// })
+app.get('/yoduhboat/api/dev', async (req, res) => {
+    const dbGuild = await Guild.findOne({name: 'TEST'})
+    dbGuild.history = []
+    dbGuild.save()
+    return res.sendStatus(200)
+})
 
 app.post('/yoduhboat/api/getToken', async (req, res) => {
     const params = new URLSearchParams();
@@ -146,17 +146,17 @@ const playerForceStart = (guildId, guildPlayer) => {
 }
 let debounceStart = debounce(playerForceStart, 500);
 app.post('/yoduhboat/api/remove', async (req, res) => { 
-    const guildId = req.body.guild;
+    const { guildId, userId, songId } = req.body;
+    const message = await generateFakeMessage(userId, guildId)
     const guildPlayer = masterPlayer.getPlayer(guildId);
     try {
-        await commands.remove(req.body.songId, null, guildPlayer, true);
+        await commands.remove(songId, message, guildPlayer, true);
         return res.sendStatus(200);
     } catch(e) {
         console.log('remove err', e)
         return res.status(500).send(e.toString());
     } finally {
         // debounce to allow enough time for player to stop and handle possibly more 'remove first song' requests
-        console.log('queue length', guildPlayer.queue.length)
         if (guildPlayer.songRemoving) {
             debounceStart(guildId, guildPlayer);
         } else {
@@ -166,16 +166,14 @@ app.post('/yoduhboat/api/remove', async (req, res) => {
 });
 
 app.post('/yoduhboat/api/pause', async (req, res) => {
-    console.log('pause endpoint hit')
-    const guildId = req.body.guild;
+    const { guildId, userId } = req.body;
     const guildPlayer = masterPlayer.getPlayer(guildId);
+    const message = await generateFakeMessage(userId, guildId)
     try {
         // if current song removed while paused, player will not have a resource and need to issue playTrack() instead of pause()
         if (guildPlayer.player.state.resource) {
-            console.log('toggling pause');
-            await commands.pause(null, guildPlayer);
+            await commands.pause(message, guildPlayer);
         } else if (guildPlayer.queue.length > 0) {
-            console.log('manually playing next track')
             const item = guildPlayer.queue[0];
             masterPlayer.playTrack(item, guildPlayer);
         }
@@ -188,16 +186,13 @@ app.post('/yoduhboat/api/pause', async (req, res) => {
 })
 
 app.post('/yoduhboat/api/seek', async (req, res) => {
-    console.log('seek endpoint')
     const guildId = req.body.guild;
     const guildPlayer = masterPlayer.getPlayer(guildId);
     guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
     try {
         await commands.seek(req.body.seekTime, guildPlayer);
         res.sendStatus(200);
-        console.log('done seeking, status?', guildPlayer.player.state.status)
         if (guildPlayer.player.state.status !== 'paused') {
-            console.log('update em')
             updateWebClients('sync', guildId, guildPlayer)
         }
         return;
@@ -240,12 +235,11 @@ app.post('/yoduhboat/api/addSongNext', async (req, res) => {
 })
 
 app.post('/yoduhboat/api/shuffle', async (req, res) => {
-    console.log('shuffle endpoint')
-    const guildId = req.body.guild;
+    const { guildId, userId } = req.body;
+    const message = await generateFakeMessage(userId, guildId)
     const guildPlayer = masterPlayer.getPlayer(guildId);
     try {
-        let result = await commands.shuffle(null, guildPlayer, true);
-        console.log('result', result);
+        await commands.shuffle(message, guildPlayer, true);
         updateWebClients('shuffle', guildId, guildPlayer)
         return res.sendStatus(200);
     } catch(e) {
@@ -260,7 +254,6 @@ app.post('/yoduhboat/api/search', async (req, res) => {
     // youtube playlist
     if (text.includes("list=")) {
         results = await play.playlist_info(text, { incomplete : true });
-        console.log('results', results)
         results.type = 'playlist'
     }
     // spotify
@@ -271,7 +264,6 @@ app.post('/yoduhboat/api/search', async (req, res) => {
         let spotifyData = await play.spotify(text);
         // spotify album or playlist (return 1 search result per song)
         if(spotifyData.tracksCount) {
-            console.log('spotifyData', spotifyData)
             const spotifyTracks = spotifyData.fetched_tracks.values().next().value;
             results = await Promise.all(spotifyTracks.map(async track => {
                 // get info for closest matching youtube result
@@ -350,7 +342,7 @@ app.get('/yoduhboat/api/playlists', async (req, res) => {
 
 app.get('/yoduhboat/api/playlist', async (req, res) => {
     const { playlistId } = req.query
-    let playlist = await Playlist.findById(playlistId).populate('songs').populate('createdBy', 'global_name');
+    let playlist = await Playlist.findById(playlistId).populate({ path: 'songs', options: { sort: { 'order': 'asc' }}}).populate('createdBy', 'global_name');
     if (!playlist) {
         return res.status(404).send('Playlist not found')
     }
@@ -413,17 +405,53 @@ app.post('/yoduhboat/api/playlist/addsong', async (req, res) => {
     }
 });
 
-app.post('/yoduhboat/api/stop', async (req, res) => { 
-    const { guildId } = req.body
-    const guildPlayer = masterPlayer.getPlayer(guildId);
+app.post('/yoduhboat/api/playlist/reorder', async (req, res) => { 
+    const { songs, guildId } = req.body
     try {
-        await commands.stop(null, guildPlayer,  true);
+        if (Array.isArray(songs) && songs.length > 0) {
+            for(const song of songs) {
+                const dbSong = await Song.findById(new mongoose.Types.ObjectId(song.id))
+                dbSong.order = song.order
+                await dbSong.save()
+            }
+        }
+    } catch(e) {
+        console.log('playlist add err', e)
+        return res.status(500).send(e.toString());
+    } finally {
+        updateWebClients('playlist', guildId)
+        return res.sendStatus(200);
+    }
+});
+
+app.post('/yoduhboat/api/stop', async (req, res) => { 
+    const { guildId, userId } = req.body
+    const guildPlayer = masterPlayer.getPlayer(guildId);
+    const message = await generateFakeMessage(userId, guildId)
+    try {
+        await commands.stop(message, guildPlayer,  true);
         return res.sendStatus(200);
     } catch(e) {
         console.log('stop err', e)
         return res.status(500).send(e.toString());
     } finally {
         updateWebClients('stop', guildId)
+    }
+});
+
+app.get('/yoduhboat/api/history', async (req, res) => { 
+    const { guildId } = req.query
+    try {
+        const dbHistory = await History.find({ guildId: guildId }).sort({ createdAt: 'desc' }).populate('song', ['title', 'artist', 'link']).populate('user', 'global_name')
+        // let dbGuild = await Guild.findOne({guildId: guildId}).populate({ path: 'history', options: { sort: { 'createdAt': 'desc' }}}).exec();
+        if (dbHistory) {
+            return res.status(200).send(dbHistory);
+        } else {
+            res.status(404).send('guild not found for guild');
+        }
+    } catch(e) {
+        console.log('history err', e)
+        return res.status(500).send(e.toString());
     }
 });
 
@@ -455,7 +483,6 @@ async function generateFakeMessage(userId, guildId) {
             voiceAdapterCreator: guild.voiceAdapterCreator
         }
     }
-    console.log('message', message)
     return message;
 }
 
