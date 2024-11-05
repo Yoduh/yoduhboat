@@ -1,14 +1,14 @@
-const play = require('play-dl');
-const { createAudioResource } = require('@discordjs/voice');
-const { broadcastDoneSong, updateWebClients } = require('./Websocket');
-const util = require('./helpers/util');
+const play = require("play-dl");
+const { createAudioResource } = require("@discordjs/voice");
+const { broadcastDoneSong, updateWebClients } = require("./Websocket");
+const util = require("./helpers/util");
 
 // do NOT clear queue by setting it to an empty array because it'll get rid of this...
-const eventify = function(arr, callback) {
-    arr.push = function() {
-        Array.prototype.push.call(arr, ...arguments);
-        callback(arr);
-    };
+const eventify = function (arr, callback) {
+  arr.push = function () {
+    Array.prototype.push.call(arr, ...arguments);
+    callback(arr);
+  };
 };
 
 // possible alternative if I can add reference to guildPlayer to check isPlaying
@@ -20,221 +20,254 @@ const eventify = function(arr, callback) {
 //     }
 // });
 
-const {
-	createAudioPlayer,
-	AudioPlayerStatus,
-} = require('@discordjs/voice');
+const { createAudioPlayer, AudioPlayerStatus } = require("@discordjs/voice");
 
 module.exports = class Player {
-    constructor(_client) {
-        this.client = _client;
-        this.guildPlayers = new Map();
-        
-        this.client.on("voiceStateUpdate", this.voiceStateUpdate.bind(this));
+  constructor(_client) {
+    this.client = _client;
+    this.guildPlayers = new Map();
+    // this.agent = ytdl.createAgent(cookies);
+    this.client.on("voiceStateUpdate", this.voiceStateUpdate.bind(this));
+  }
+
+  // if user joins/leaves a channel and there is a ws.id matching user.id, need to ws.send(voiceChannel: null)
+  voiceStateUpdate = async (oldState, newState) => {
+    const guildPlayer = this.getPlayer(oldState.guild.id);
+    if (!guildPlayer || newState.guild.afkChannelId === newState.channelId)
+      return;
+    if (newState.member.user.id === newState.guild.members.me.user.id) {
+      guildPlayer.voiceChannel = newState.channel
+        ? { id: newState.channel.id, name: newState.channel.name }
+        : null;
+      // inform listening websockets of new bot voice channel
+      updateWebClients("join", newState.guild.id, guildPlayer);
+      return;
+    }
+    if (newState.member.user.bot) return;
+    // inform specific websocket if their matching user has joined a new voice channel
+    let ws = [...wss.clients].find((ws) => ws.id === newState.member.user.id);
+    if (ws) {
+      ws.send(JSON.stringify({ userVoiceId: newState.channelId }));
     }
 
-    // if user joins/leaves a channel and there is a ws.id matching user.id, need to ws.send(voiceChannel: null)
-    voiceStateUpdate = async (oldState, newState) => {
-        const guildPlayer = this.getPlayer(oldState.guild.id);
-        if (!guildPlayer || newState.guild.afkChannelId === newState.channelId) return;
-        if (newState.member.user.id === newState.guild.members.me.user.id) {
-            guildPlayer.voiceChannel = newState.channel ? { id: newState.channel.id, name: newState.channel.name } : null;
-            // inform listening websockets of new bot voice channel
-            updateWebClients('join', newState.guild.id, guildPlayer);
-            return;
-        } 
-        if(newState.member.user.bot) return;
-        // inform specific websocket if their matching user has joined a new voice channel
-        let ws = [...wss.clients].find(ws => ws.id === newState.member.user.id )
-        if (ws) {
-            ws.send(JSON.stringify({ userVoiceId: newState.channelId }))
-        }
-
-        if (guildPlayer.timeout && newState?.channelId && newState.channelId === newState.guild?.members?.me?.voice?.channelId) {
-            clearTimeout(guildPlayer.timeout) //If user is joining bot's channel, remove idle timer if it exists
-            console.log("user joined. timeout cleared!");
-            return;
-        }
-        if (oldState.channelId !== oldState.guild.members.me.voice.channelId || !oldState.channel){
-            return; //If user left channel that wasn't bot's channel... don't care
-        }
-        if(oldState.channel.members.filter(m => !m.user.bot).size === 0 && guildPlayer.connection){
-            if (guildPlayer.player.state.status === 'playing' && guildPlayer.responseChannel) {
-                guildPlayer.responseChannel.send("No users remain in the channel, pausing player");
-                guildPlayer.player.pause();
-            }
-            console.log("No users remain in the channel, setting timeout");
-            guildPlayer.timeout = setTimeout(() => {
-                console.log("timeout expired")
-                guildPlayer.queue.length = 0;
-                guildPlayer.player.stop(true);
-                guildPlayer.isPlaying = false;
-                guildPlayer.connection.disconnect();
-                guildPlayer.connection = null;
-            }, 15*60*1000)
-        }
+    if (
+      guildPlayer.timeout &&
+      newState?.channelId &&
+      newState.channelId === newState.guild?.members?.me?.voice?.channelId
+    ) {
+      clearTimeout(guildPlayer.timeout); //If user is joining bot's channel, remove idle timer if it exists
+      console.log("user joined. timeout cleared!");
+      return;
     }
+    if (
+      oldState.channelId !== oldState.guild.members.me.voice.channelId ||
+      !oldState.channel
+    ) {
+      return; //If user left channel that wasn't bot's channel... don't care
+    }
+    if (
+      oldState.channel.members.filter((m) => !m.user.bot).size === 0 &&
+      guildPlayer.connection
+    ) {
+      if (
+        guildPlayer.player.state.status === "playing" &&
+        guildPlayer.responseChannel
+      ) {
+        guildPlayer.responseChannel.send(
+          "No users remain in the channel, pausing player"
+        );
+        guildPlayer.player.pause();
+      }
+      console.log("No users remain in the channel, setting timeout");
+      guildPlayer.timeout = setTimeout(() => {
+        console.log("timeout expired");
+        guildPlayer.queue.length = 0;
+        guildPlayer.player.stop(true);
+        guildPlayer.isPlaying = false;
+        guildPlayer.connection.disconnect();
+        guildPlayer.connection = null;
+      }, 15 * 60 * 1000);
+    }
+  };
 
-    getPlayer(guild) {
-        guild = this.client.guilds.resolve(guild);
-        if (!guild) {
-            console.log("error: no guild found in client")
+  getPlayer(guild) {
+    guild = this.client.guilds.resolve(guild);
+    if (!guild) {
+      console.log("error: no guild found in client");
+    }
+    if (this.guildPlayers.has(guild.id)) {
+      return this.guildPlayers.get(guild.id);
+    }
+    const guildPlayer = {
+      guildId: guild.id,
+      voiceChannel: null,
+      responseChannel: null,
+      player: createAudioPlayer(),
+      queue: [],
+      currentStream: null,
+      pausedResource: null,
+      connection: null,
+      timeout: null,
+      isPlaying: false,
+      songRemoving: false,
+      socketListeners: new Set(),
+      broadcaster: null,
+    };
+    guildPlayer.forceStart = () => {
+      console.log("forcing start");
+      guildPlayer.songRemoving = false;
+      if (guildPlayer.currentStream) {
+        // if resource stream exists, we didn't remove while in pause state, so play immediately
+        this.attemptPlay(guildPlayer);
+        guildPlayer.broadcastSync();
+      }
+    };
+    guildPlayer.broadcastSync = () => {
+      if (!guildPlayer.broadcaster) {
+        guildPlayer.broadcaster = setInterval(() => {
+          if (
+            guildPlayer.socketListeners.size > 0 &&
+            !guildPlayer.songRemoving
+          ) {
+            // console.log('Player is sending sync update', guildPlayer.currentStream.playbackDuration)
+            updateWebClients("sync", guildPlayer.guildId, guildPlayer);
+          }
+        }, 3000);
+      }
+    };
+    guildPlayer.player.on(AudioPlayerStatus.Playing, async () => {
+      // console.log('in playing status, broadcast?', guildPlayer.broadcaster)
+      guildPlayer.broadcastSync();
+    }),
+      guildPlayer.player.on(AudioPlayerStatus.Paused, async () => {
+        console.log("pause state");
+        if (guildPlayer.broadcaster) {
+          guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
         }
-        if (this.guildPlayers.has(guild.id)) {
-            return this.guildPlayers.get(guild.id);
+      }),
+      guildPlayer.player.on(AudioPlayerStatus.Idle, async () => {
+        if (guildPlayer.songRemoving) {
+          console.log(
+            "song removal from web is going on, waiting for force start..."
+          );
+          return;
         }
-        const guildPlayer = {
-            guildId: guild.id,
-            voiceChannel: null,
-            responseChannel: null,
-            player: createAudioPlayer(),
-            queue: [],
-            currentStream: null,
-            pausedResource: null,
-            connection: null,
-            timeout: null,
-            isPlaying: false,
-            songRemoving: false,
-            socketListeners: new Set(),
-            broadcaster: null
+        console.log("player is idle, shifting queue");
+        // cancel scheduled sync from previous song
+        if (guildPlayer.broadcaster) {
+          guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
         }
-        guildPlayer.forceStart = () => {
-            console.log('forcing start');
-            guildPlayer.songRemoving = false;
-            if (guildPlayer.currentStream) {    // if resource stream exists, we didn't remove while in pause state, so play immediately
-                this.attemptPlay(guildPlayer)
-                guildPlayer.broadcastSync();
-            }
+        const doneItem = guildPlayer.queue.shift();
+        if (doneItem) {
+          broadcastDoneSong(guildPlayer.guildId, doneItem.song);
         }
-        guildPlayer.broadcastSync = () => {
-            if (!guildPlayer.broadcaster) {
-                guildPlayer.broadcaster = setInterval(() => {
-                    if (guildPlayer.socketListeners.size > 0 && !guildPlayer.songRemoving) {
-                        // console.log('Player is sending sync update', guildPlayer.currentStream.playbackDuration)
-                        updateWebClients('sync', guildPlayer.guildId, guildPlayer)
-                    }
-                }, 3000);
-            }
+        //play until queue is empty
+        if (guildPlayer.queue.length > 0) {
+          this.attemptPlay(guildPlayer);
+        } else {
+          console.log("queue is empty.  isPlaying = false");
+          guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
+          guildPlayer.isPlaying = false;
         }
-        guildPlayer.player.on(AudioPlayerStatus.Playing, async () => {
-            // console.log('in playing status, broadcast?', guildPlayer.broadcaster)
-            guildPlayer.broadcastSync();
-        }),
-        guildPlayer.player.on(AudioPlayerStatus.Paused, async () => {
-            console.log('pause state')
-            if (guildPlayer.broadcaster) {
-                guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
-            }
-        }),
-        guildPlayer.player.on(AudioPlayerStatus.Idle, async () => {
-            if (guildPlayer.songRemoving) {
-                console.log("song removal from web is going on, waiting for force start...");
-                return;
-            }
-            console.log("player is idle, shifting queue");
-            // cancel scheduled sync from previous song
-            if (guildPlayer.broadcaster) {
-                guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
-            }
-            const doneItem = guildPlayer.queue.shift();
-            if (doneItem) {
-                broadcastDoneSong(guildPlayer.guildId, doneItem.song);
-            }
-            //play until queue is empty
-            if (guildPlayer.queue.length > 0) {
-                this.attemptPlay(guildPlayer)
-            } else {
-                console.log("queue is empty.  isPlaying = false");
-                guildPlayer.broadcaster = clearInterval(guildPlayer.broadcaster);
-                guildPlayer.isPlaying = false;
-            }
+      });
+
+    eventify(guildPlayer.queue, async () => {
+      if (guildPlayer.player.state.status === "paused") {
+        console.log("eventify: player is paused, unpausing");
+        guildPlayer.player.unpause();
+      }
+      if (!guildPlayer.isPlaying) {
+        console.log(
+          "eventify: player is not playing, playing first track in queue"
+        );
+        this.attemptPlay(guildPlayer);
+      } else {
+        console.log(
+          "eventify: guild player is already playing, not forcing play"
+        );
+      }
+    });
+
+    this.guildPlayers.set(guild.id, guildPlayer);
+    return guildPlayer;
+  }
+
+  async attemptPlay(guildPlayer) {
+    let success = false;
+    let queueItem = null;
+    while (!success) {
+      queueItem = guildPlayer.queue[0];
+      try {
+        success = await this.playTrack(queueItem, guildPlayer);
+      } catch (e) {
+        console.log(e);
+        if (!queueItem.isWeb) {
+          queueItem.message.reply(
+            `Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`
+          );
+        }
+        updateWebClients("error", guildPlayer.guildId, guildPlayer, {
+          error: `Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`,
         });
-
-        eventify(guildPlayer.queue, async () => {
-            if (guildPlayer.player.state.status === 'paused') {
-                console.log("eventify: player is paused, unpausing");
-                guildPlayer.player.unpause();
-            }
-            if (!guildPlayer.isPlaying) {
-                console.log("eventify: player is not playing, playing first track in queue")
-                this.attemptPlay(guildPlayer)
-            } else {
-                console.log("eventify: guild player is already playing, not forcing play")
-            }
-        });
-
-        this.guildPlayers.set(guild.id, guildPlayer);
-        return guildPlayer;
-    }
-
-    async attemptPlay(guildPlayer) {
-        let success = false
-        let queueItem = null
-        while (!success) {
-            queueItem = guildPlayer.queue[0];
-            try {
-                success = await this.playTrack(queueItem, guildPlayer);
-            } catch(e) {
-                console.log(e);
-                if (!queueItem.isWeb) {
-                    queueItem.message.reply(`Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`)
-                }
-                updateWebClients('error', guildPlayer.guildId, guildPlayer, { error: `Can't play "${queueItem.song.title}", probably no longer available on YouTube... Skipping`})
-                guildPlayer.queue.shift();
-                broadcastDoneSong(guildPlayer.guildId, queueItem.song)
-                if (guildPlayer.queue.length === 0) {
-                    success = true
-                }
-            }
+        guildPlayer.queue.shift();
+        broadcastDoneSong(guildPlayer.guildId, queueItem.song);
+        if (guildPlayer.queue.length === 0) {
+          success = true;
         }
+      }
     }
+  }
 
-    async playTrack(args, guildPlayer) {
-        return new Promise(async (resolve, reject) => {
-            const song = args.song;
-            // const isWeb = args.isWeb;
-            // const message = args.message
+  async playTrack(args, guildPlayer) {
+    return new Promise(async (resolve, reject) => {
+      const song = args.song;
+      // const isWeb = args.isWeb;
+      // const message = args.message
 
-            // legacy database song needs to be updated to youtube link
-            if (song.link.includes('spotify.com')) {
-                if (play.is_expired()) {
-                    await play.refreshToken();
-                }
-                const songInfo = await play.spotify(song.link);
-                // get info for closest matching youtube result
-                let results = await play.search(`${songInfo.artists[0].name} ${songInfo.name}`, {
-                    limit: 1
-                })
-                song.link = results[0].url
-                song.duration = results[0].durationInSec
-                song.durationTime = results[0].durationRaw
-                await song.save()
-            }
+      // legacy database song needs to be updated to youtube link
+      if (song.link.includes("spotify.com")) {
+        if (play.is_expired()) {
+          await play.refreshToken();
+        }
+        const songInfo = await play.spotify(song.link);
+        // get info for closest matching youtube result
+        let results = await play.search(
+          `${songInfo.artists[0].name} ${songInfo.name}`,
+          {
+            limit: 1,
+          }
+        );
+        song.link = results[0].url;
+        song.duration = results[0].durationInSec;
+        song.durationTime = results[0].durationRaw;
+        await song.save();
+      }
 
-            guildPlayer.isPlaying = true;
-            let stream = null
-            try {
-                stream = await play.stream(song.link)
-            } catch (e) {
-                return reject(e)
-            }
-            if (stream) {
-                let resource = createAudioResource(stream.stream, {
-                    inlineVolume: true,
-                    inputType: stream.type
-                })
-                resource.volume.setVolume(0.2);
-                guildPlayer.currentStream = resource;
-                guildPlayer.player.play(resource);
-            }
-            const title = `${song.artist ? song.artist + ' - ': ''}${song.title}`
-            const historyDetails = {
-                action: `now playing %TITLE%${title}%TITLE%%LINK%${song.link}%LINK%`,
-                userId: null,
-                guildId: guildPlayer.guildId
-            }
-            util.createHistory(historyDetails)
-            resolve(true);
-        })
-    }
-}
+      guildPlayer.isPlaying = true;
+      let stream = null;
+      try {
+        stream = await play.stream(song.link);
+        // stream = await ytdl(song.link, {filter : "audioonly"});
+      } catch (e) {
+        return reject(e);
+      }
+      if (stream) {
+        let resource = createAudioResource(stream.stream, {
+          inlineVolume: true,
+          // inputType: stream.type
+        });
+        resource.volume.setVolume(0.2);
+        guildPlayer.currentStream = resource;
+        guildPlayer.player.play(resource);
+      }
+      const title = `${song.artist ? song.artist + " - " : ""}${song.title}`;
+      const historyDetails = {
+        action: `now playing %TITLE%${title}%TITLE%%LINK%${song.link}%LINK%`,
+        userId: null,
+        guildId: guildPlayer.guildId,
+      };
+      util.createHistory(historyDetails);
+      resolve(true);
+    });
+  }
+};
